@@ -1,0 +1,8 @@
+example
+
+APP_PORT=yourAppPort
+DB_HOST=host.com
+DB_PORT=yourDbPort
+DB_USER=yourDbUsername
+DB_PASS=yourDbPassword
+DB_NAME=yourDbName
