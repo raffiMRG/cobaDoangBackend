@@ -1,2 +1,6 @@
-``` git clone https://github.com/raffiMRG/cobaDoangBackend.git ```
-``` go mod tidy ```
+```bash
+git clone https://github.com/raffiMRG/cobaDoangBackend.git
+```
+```bash
+go mod tidy
+```
