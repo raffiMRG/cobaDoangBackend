@@ -98,7 +98,8 @@ func GetAllData(table string) model.BaseResponseModel {
 func GetDataFromId(table, id string) model.BaseResponseModel {
 	// var query string
 	var result model.BaseResponseModel
-	var listData []tbFolder.Folder
+	// var listData []tbFolder.Folder
+	var listData *tbFolder.Folder
 	// db := connection.DB
 	tempResult := connection.DB
 
@@ -135,7 +136,7 @@ func GetDataFromId(table, id string) model.BaseResponseModel {
 			Message:       tempResult.Error.Error(),
 			Data:          nil,
 		}
-	} else if len(listData) == 0 {
+	} else if listData == nil {
 		result = model.BaseResponseModel{
 			CodeResponse:  404,
 			HeaderMessage: "Error",
@@ -154,33 +155,65 @@ func GetDataFromId(table, id string) model.BaseResponseModel {
 	return result
 }
 
-func GetRowFromId(table, id string) ([]tbFolder.Folder, error) {
+// func GetRowFromId(table, id string) ([]tbFolder.Folder, error) {
+// 	var query string
+// 	var listData []tbFolder.Folder
+// 	var errorMessage error
+// 	db := connection.DB
+// 	tempResult := connection.DB
+
+// 	if id != "" {
+// 		intId, err := strconv.Atoi(id)
+// 		if err != nil {
+// 			errorMessage = errors.New("invalid paremeter input for 'id'")
+// 			return nil, errorMessage
+// 		}
+
+// 		tempResult = db.Where("id = ?", intId).Find(&listData)
+// 		fmt.Println("id query " + id)
+// 	} else {
+// 		query = fmt.Sprintf("SELECT * FROM %s", table)
+// 		tempResult = db.Raw(query).Find(&listData)
+// 		fmt.Println("tampilkan semua data dari tabel")
+// 	}
+
+// 	if tempResult.Error != nil {
+// 		return nil, tempResult.Error
+// 	}
+
+// 	return listData, nil
+// }
+
+func GetRowFromId(table, id string) (*tbFolder.Folder, error) {
 	var query string
-	var listData []tbFolder.Folder
+	var data tbFolder.Folder
 	var errorMessage error
 	db := connection.DB
-	tempResult := connection.DB
 
 	if id != "" {
 		intId, err := strconv.Atoi(id)
 		if err != nil {
-			errorMessage = errors.New("invalid paremeter input for 'id'")
+			errorMessage = errors.New("invalid parameter input for 'id'")
 			return nil, errorMessage
 		}
 
-		tempResult = db.Where("id = ?", intId).Find(&listData)
+		// Ambil 1 data berdasarkan ID
+		result := db.Where("id = ?", intId).First(&data)
+		if result.Error != nil {
+			return nil, result.Error
+		}
 		fmt.Println("id query " + id)
 	} else {
-		query = fmt.Sprintf("SELECT * FROM %s", table)
-		tempResult = db.Raw(query).Find(&listData)
-		fmt.Println("tampilkan semua data dari tabel")
+		// Ambil 1 data pertama dari tabel jika id tidak diberikan
+		query = fmt.Sprintf("SELECT * FROM %s LIMIT 1", table)
+		result := db.Raw(query).Scan(&data)
+		if result.Error != nil {
+			return nil, result.Error
+		}
+		fmt.Println("tampilkan satu data pertama dari tabel")
 	}
 
-	if tempResult.Error != nil {
-		return nil, tempResult.Error
-	}
-
-	return listData, nil
+	return &data, nil
 }
 
 // =======================================================
@@ -194,15 +227,21 @@ func MoveRows(ids []int, sourceTable, targetTable string) model.BaseResponseMode
 	// // Inisialisasi transaksi
 	result := db.Transaction(func(tx *gorm.DB) error {
 		for _, id := range ids {
+			// filter id pastikan tidak minus
+			if id < 0 {
+				return fmt.Errorf("invalid id: %d cannot be negative", id)
+			}
+
 			// 	// 1. Ambil data dari tabel sumber
 			strId := strconv.Itoa(id)
-			rows, err := GetRowFromId(sourceTable, strId)
+			row, err := GetRowFromId(sourceTable, strId)
 
 			if err != nil {
 				return err
 			}
 
-			if len(rows) == 0 {
+			// if len(rows) == 0 {
+			if row == nil {
 				// Append default data to the response
 				defaultData := dto.InputDataRes{
 					// ID:     id,
@@ -213,22 +252,37 @@ func MoveRows(ids []int, sourceTable, targetTable string) model.BaseResponseMode
 				fmt.Println("masuk response false 1")
 				continue
 			}
-
-			// Buat slice baru hanya dengan field Name
-			// newRows := make([]tbFolder.Folder, len(rows))
-			newRows := make([]NewFolder.NewFolder, len(rows))
-			for i, row := range rows {
-				// newRows[i] = tbFolder.Folder{
-				// 	Name: row.Name, // Hanya ambil Name
-				// }
-				newRows[i] = NewFolder.NewFolder{
-					Name:        row.Name, // Hanya ambil Name
-					IsCompleted: false,    // Isi nilai devault true
-				}
+			// newRows := NewFolder.NewFolder{
+			newRow := NewFolder.NewFolder{
+				Name:        row.Name, // Hanya ambil Name
+				IsCompleted: false,    // Isi nilai devault true
 			}
 
+			// COPY DATA
+			// copyFailed := false
+			// for _, data := range newRows {
+
+			source := "../sementara/" + newRow.Name + "/"
+			// destination := "../folder0/folder3/"
+			destination := "../new/" + newRow.Name + "/"
+
+			if err := copyPaste(source, destination); err != nil {
+				fmt.Println("Error:", err)
+				// copyFailed = true
+				response = append(response, dto.InputDataRes{
+					ID:     uint(id),
+					Title:  "Copy failed",
+					Status: false,
+				})
+				break
+				// continue
+			} else {
+				fmt.Println("file dan folder berhasil disalin.")
+			}
+			// }
+
 			// 	// 2. Masukkan data ke tabel tujuan
-			if err := tx.Table(targetTable).Create(&newRows).Error; err != nil {
+			if err := tx.Table(targetTable).Create(&newRow).Error; err != nil {
 				// return err
 				defaultData := dto.InputDataRes{
 					// ID:     id,
@@ -239,54 +293,38 @@ func MoveRows(ids []int, sourceTable, targetTable string) model.BaseResponseMode
 				fmt.Println("masuk response false 2")
 				continue
 			} else {
+				// defaultData := dto.InputDataRes{
+				// 	// ID:     id,
+				// 	Title:  "Success",
+				// 	Status: true,
+				// }
+
+				// response = append(response, defaultData)
+				fmt.Println("masuk response success pindah data")
+			}
+
+			// // 	// 3. Hapus data dari tabel sumber
+			// var indexs []int
+			// for _, row := range rows {
+			// 	indexs = append(indexs, int(row.ID))
+			// }
+
+			if err := tx.Table(sourceTable).Where("id = ?", row.ID).Delete(nil).Error; err != nil {
+				return fmt.Errorf("failed to delete rows from source table: %w", err)
+			} else {
 				defaultData := dto.InputDataRes{
-					// ID:     id,
+					ID:     uint(id),
 					Title:  "Success",
 					Status: true,
 				}
-				// COPY DATA
-				for _, data := range newRows {
-
-					source := "../folder0/folder1/" + data.Name + "/"
-					// destination := "../folder0/folder3/"
-					destination := "../folder0/folder3/" + data.Name + "/"
-
-					if err := copyPaste(source, destination); err != nil {
-						fmt.Println("Error:", err)
-					} else {
-						fmt.Println("Semua file dan folder berhasil disalin.")
-					}
-					fmt.Println(destination)
-				}
-
 				response = append(response, defaultData)
-				fmt.Println("masuk response success")
+				fmt.Println("masuk response success hapus data")
 			}
-
-			// 	// 3. Hapus data dari tabel sumber
-			// 	var indexs []int
-			// 	for _, row := range rows {
-			// 		indexs = append(indexs, int(row.ID))
-			// 	}
-
-			// 	// listDataSuccess = ids
-
-			// 	if err := tx.Table(sourceTable).Where("id IN ?", indexs).Delete(nil).Error; err != nil {
-			// 		return fmt.Errorf("failed to delete rows from source table: %w", err)
-			// 	} else {
-			// 		defaultData := dto.InputDataRes{
-			// 			ID:     id,
-			// 			Title:  "Success",
-			// 			Status: true,
-			// 		}
-			// 		response = append(response, defaultData)
-			// 		fmt.Println("masuk response success")
-			// 	}
 		}
-
 		// return fmt.Errorf("rows moved")
 		return nil
 	})
+
 	if result != nil {
 		return FailedResponse(result)
 	} else {
@@ -363,6 +401,15 @@ func FilteredData(table, table2 string) model.BaseResponseModel {
 	}
 
 	return result
+}
+
+func IsFolderExist(db *gorm.DB, folderName string) (bool, error) {
+	var count int64
+	err := db.Model(&tbFolder.Folder{}).Where("name = ?", folderName).Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 func FailedResponse(message error) model.BaseResponseModel {

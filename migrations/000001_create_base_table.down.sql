@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS new_folder;
+DROP TABLE IF EXISTS folder;

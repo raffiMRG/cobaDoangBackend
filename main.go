@@ -1,6 +1,7 @@
 package main
 
 import (
+	// "fmt"
 	"fmt"
 	"log"
 	"os"
@@ -13,20 +14,28 @@ import (
 )
 
 func main() {
+	var err error
 
 	// Memuat file .env
-	err := godotenv.Load()
+	err = godotenv.Load()
 	if err != nil {
 		fmt.Printf("Error loading .env file: %v", err)
 	}
 
 	// Membaca variabel dari lingkungan
-	appPort := os.Getenv("APP_PORT")
-	dbHost := os.Getenv("DB_HOST")
-	dbPort := os.Getenv("DB_PORT")
-	dbUser := os.Getenv("DB_USER")
-	dbPass := os.Getenv("DB_PASS")
-	dbName := os.Getenv("DB_NAME")
+	var appPort string = os.Getenv("APP_PORT")
+	var dbHost string = os.Getenv("DB_APP_HOST")
+	var dbPort string = os.Getenv("DB_PORT")
+	var dbUser string = os.Getenv("DB_USER")
+	var dbPass string = os.Getenv("DB_PASS")
+	var dbName string = os.Getenv("DB_NAME")
+
+	// fmt.Println("app port:", appPort)
+	// fmt.Println("db host:", dbHost)
+	// fmt.Println("db port:", dbPort)
+	// fmt.Println("db user:", dbUser)
+	// fmt.Println("db pass:", dbPass)
+	// fmt.Println("db name:", dbName)
 
 	// Koneksi ke MySQL
 	_, err = conn.ConnectMySQL(dbUser, dbPass, dbHost, dbPort, dbName)
@@ -38,8 +47,8 @@ func main() {
 	r := gin.Default()
 
 	r.GET("/update", folderController.UpdateAndInsert)
-	// r.GET("/folders", folderController.DisplayAllDataFolder)
-	r.GET("/folders", folderController.GetDataById)
+	r.GET("/folders", folderController.DisplayAllDataFolder)
+	r.GET("/folder", folderController.GetDataById)
 
 	r.POST("/folders", folderController.MoveRow)
 

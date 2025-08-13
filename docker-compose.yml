@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: go-backend
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      APP_PORT: ${APP_PORT}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_USER: ${DB_USER}
+      DB_PASS: ${DB_PASS}
+      DB_NAME: ${DB_NAME}
+    networks:
+      - manga-network
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql_manga
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASS}
+      MYSQL_DATABASE: ${DB_NAME}
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - manga-network
+
+  migrate:
+    image: migrate/migrate
+    container_name: manga-migration
+    volumes:
+      # - ./cobaDoangBackend/migrations:/migrations
+      - ./migrations:/migrations
+    command: [ "-path", "/migrations", "-database", "${MYSQL_URI}", "up" ]
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - manga-network
+
+volumes:
+  mysql_data:
+
+networks:
+  manga-network:
+    driver: bridge

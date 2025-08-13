@@ -1,0 +1,15 @@
+USE manga;
+
+-- Tabel Folders
+CREATE TABLE IF NOT EXISTS folders (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255)
+);
+
+-- Tabel NewFolders
+CREATE TABLE IF NOT EXISTS new_folders (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    is_completed BOOLEAN,
+    create_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

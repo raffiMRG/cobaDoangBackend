@@ -20,7 +20,8 @@ import (
 )
 
 func UpdateAndInsert(c *gin.Context) {
-	root := "../folder0/folder1/" // Change to your desired root directory
+	root := "../sementara" // Change to your desired root directory
+
 	folders, err := FolderRepositorys.ScanFolders(root)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -29,16 +30,35 @@ func UpdateAndInsert(c *gin.Context) {
 		return
 	}
 
+	db := connection.DB
 	// Process folders and insert into the database
 	var messages []messageStatus.Message
 	for _, folder := range folders {
 		unixStylePath := strings.ReplaceAll(folder, "\\", "/")
 		finalFolderName := filepath.Base(unixStylePath)
 
-		db := connection.DB
+		// Cek apakah folder sudah ada di database
+		exists, err := FolderRepositorys.IsFolderExist(db, finalFolderName)
+		if err != nil {
+			messages = append(messages, messageStatus.Message{
+				FolderName: finalFolderName,
+				Status:     "error",
+				Error:      "check failed: " + err.Error(),
+			})
+			continue
+		}
+
+		if exists {
+			messages = append(messages, messageStatus.Message{
+				FolderName: finalFolderName,
+				Status:     "skipped",
+				Error:      "folder already exists",
+			})
+			continue
+		}
 
 		// Insert into database and collect status
-		err := FolderRepositorys.InsertFolder(db, finalFolderName)
+		err = FolderRepositorys.InsertFolder(db, finalFolderName)
 		if err != nil {
 			messages = append(messages, messageStatus.Message{
 				FolderName: finalFolderName,
@@ -103,7 +123,7 @@ func MoveRow(c *gin.Context) {
 
 	// for _, ID := range request.IDS{
 	// func MoveRows(sourceTable string, targetTable string) model.BaseResponseModel {
-	response = FolderRepositorys.MoveRows(request.IDS, "folders", "new_folder")
+	response = FolderRepositorys.MoveRows(request.IDS, "folders", "new_folders")
 	// response = FolderRepositorys.MoveRows(int(ID), "folders", "new_folder")
 	if response.CodeResponse != 200 {
 		c.JSON(response.CodeResponse, response)

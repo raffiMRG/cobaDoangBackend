@@ -9,6 +9,6 @@ type NewFolder struct {
 	CreateAt    time.Time `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"create_at"`
 }
 
-func (NewFolder) TableName() string {
-	return "new_folder" // Nama tabel di database
-}
+// func (NewFolder) TableName() string {
+// 	return "new_folder" // Nama tabel di database
+// }
