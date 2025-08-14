@@ -5,6 +5,7 @@ import "time"
 type NewFolder struct {
 	ID          int       `gorm:"primaryKey;autoIncrement" json:"id"`
 	Name        string    `gorm:"type:varchar(255);not null" json:"name"`
+	Thumbnail   string    `gorm:"type:varchar(255);not null" json:"thumbnail"`
 	IsCompleted bool      `gorm:"type:boolean;" json:"is_completed"`
 	CreateAt    time.Time `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"create_at"`
 }

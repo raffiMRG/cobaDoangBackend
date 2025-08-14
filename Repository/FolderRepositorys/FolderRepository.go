@@ -3,9 +3,12 @@ package FolderRepositorys
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"web_backend/Model/NewFolder"
 	tbFolder "web_backend/Model/TbFolder"
@@ -39,9 +42,48 @@ func ScanFolders(root string) ([]string, error) {
 	return folders, err
 }
 
-func InsertFolder(db *gorm.DB, folderName string) error {
-	folder := tbFolder.Folder{Name: folderName}
+func ScanFiles(root string) ([]string, error) {
+	var files []string
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			files = append(files, filepath.Base(path))
+		}
+		return nil
+	})
+	return files, err
+}
+
+func InsertFolder(db *gorm.DB, folderName, folderPath string) error {
+	// check jika nama folder kosong
+	if folderName == "" {
+		return errors.New("folder name cannot be empty")
+	}
+
+	// check apakah directory ada
+	// fullPath := filepath.Join(path, folderName)
+	files, err := os.ReadDir(folderPath)
+	if err != nil {
+		return errors.New("folder does not exist")
+	}
+
+	// fmt.Println("path : ", path)
+	// fmt.Println("folder name : ", folderName)
+	// fmt.Println("filse name : ", files[0].Name())
+
+	// thumbnailPath := filepath.Join("http://192.168.1.133:8080/sementara/", folderName, files[0].Name())
+
+	thumbnailPath, _ := url.Parse("http://192.168.1.133:8080/sementara/")
+	thumbnailPath.Path = path.Join(thumbnailPath.Path, folderName, files[0].Name())
+	fmt.Println(thumbnailPath.String())
+
+	fmt.Println("thumbnail files:", thumbnailPath)
+
+	folder := tbFolder.Folder{Name: folderName, Thumbnail: thumbnailPath.String()}
 	return db.Create(&folder).Error
+	// return nil
 }
 
 func GetAllData(table string) model.BaseResponseModel {
@@ -93,6 +135,60 @@ func GetAllData(table string) model.BaseResponseModel {
 	return result
 }
 
+func GetAllDataNewfolders(page, limit int) model.BaseResponseModel {
+	var result model.BaseResponseModel
+	var listData []NewFolder.NewFolder
+	db := connection.DB
+
+	// Hitung offset untuk pagination
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	}
+	offset := (page - 1) * limit
+
+	// Ambil total data (untuk info pagination)
+	var total int64
+	db.Model(&NewFolder.NewFolder{}).Count(&total)
+
+	// Ambil data dengan limit & offset
+	err := db.Table("new_folders").
+		Limit(limit).
+		Offset(offset).
+		Order("id DESC").
+		Find(&listData).Error
+
+	if err != nil {
+		result = model.BaseResponseModel{
+			CodeResponse:  400,
+			HeaderMessage: "Error",
+			Message:       err.Error(),
+			Data:          nil,
+		}
+		return result
+	}
+
+	// Bungkus data + info pagination
+	data := map[string]interface{}{
+		"items": listData,
+		"total": total,
+		"page":  page,
+		"limit": limit,
+		"pages": int((total + int64(limit) - 1) / int64(limit)), // total halaman
+	}
+
+	result = model.BaseResponseModel{
+		CodeResponse:  200,
+		HeaderMessage: "Success",
+		Message:       "Data retrieved successfully",
+		Data:          data,
+	}
+
+	return result
+}
+
 // ============================================
 
 func GetDataFromId(table, id string) model.BaseResponseModel {
@@ -104,7 +200,8 @@ func GetDataFromId(table, id string) model.BaseResponseModel {
 	tempResult := connection.DB
 
 	allowedTables := map[string]bool{
-		"folders": true,
+		"folders":     true,
+		"new_folders": true,
 	}
 
 	// Periksa apakah tabel valid
@@ -155,34 +252,89 @@ func GetDataFromId(table, id string) model.BaseResponseModel {
 	return result
 }
 
-// func GetRowFromId(table, id string) ([]tbFolder.Folder, error) {
-// 	var query string
-// 	var listData []tbFolder.Folder
-// 	var errorMessage error
-// 	db := connection.DB
-// 	tempResult := connection.DB
+func GetNewfolderDataFromId(id string) model.BaseResponseModel {
 
-// 	if id != "" {
-// 		intId, err := strconv.Atoi(id)
-// 		if err != nil {
-// 			errorMessage = errors.New("invalid paremeter input for 'id'")
-// 			return nil, errorMessage
-// 		}
+	// var query string
+	var result model.BaseResponseModel
+	// var listData []tbFolder.Folder
+	var listData *NewFolder.NewFolder
+	// db := connection.DB
+	tempResult := connection.DB
+	var err error
+	var pages []string
 
-// 		tempResult = db.Where("id = ?", intId).Find(&listData)
-// 		fmt.Println("id query " + id)
-// 	} else {
-// 		query = fmt.Sprintf("SELECT * FROM %s", table)
-// 		tempResult = db.Raw(query).Find(&listData)
-// 		fmt.Println("tampilkan semua data dari tabel")
-// 	}
+	if id == "" {
+		result := model.BaseResponseModel{
+			CodeResponse:  400,
+			HeaderMessage: "Bad Request",
+			Message:       "Invalid ID",
+			Data:          nil,
+		}
+		return result
+	}
 
-// 	if tempResult.Error != nil {
-// 		return nil, tempResult.Error
-// 	}
+	// listData, err := GetNewfolderRowFromId(id)
 
-// 	return listData, nil
-// }
+	// if err != nil {
+	if listData, err = GetNewfolderRowFromId(id); err != nil {
+		result := model.BaseResponseModel{
+			CodeResponse:  400,
+			HeaderMessage: "Error",
+			Message:       err.Error(),
+			Data:          nil,
+		}
+		return result
+	}
+
+	scanPath := "../new/" + listData.Name
+	fmt.Println("Scanning path:", scanPath)
+
+	// scan folder dan ambil page
+	if pages, err = ScanFiles(scanPath); err != nil {
+		result := model.BaseResponseModel{
+			CodeResponse:  400,
+			HeaderMessage: "Error",
+			Message:       err.Error(),
+			Data:          nil,
+		}
+		return result
+	}
+
+	// Masukkan ke struct response
+	response := dto.NewFolderResponse{
+		ID:          listData.ID,
+		Name:        listData.Name,
+		Thumbnail:   listData.Thumbnail,
+		IsCompleted: listData.IsCompleted,
+		CreateAt:    listData.CreateAt,
+		Page:        pages,
+	}
+
+	if tempResult.Error != nil {
+		result = model.BaseResponseModel{
+			CodeResponse:  400,
+			HeaderMessage: "Error",
+			Message:       tempResult.Error.Error(),
+			Data:          nil,
+		}
+	} else if listData == nil {
+		result = model.BaseResponseModel{
+			CodeResponse:  404,
+			HeaderMessage: "Error",
+			Message:       "Data Not Found",
+			Data:          nil,
+		}
+	} else {
+		result = model.BaseResponseModel{
+			CodeResponse:  200,
+			HeaderMessage: "Success",
+			Message:       "Data retrieved successfully :)",
+			Data:          response,
+		}
+	}
+
+	return result
+}
 
 func GetRowFromId(table, id string) (*tbFolder.Folder, error) {
 	var query string
@@ -212,6 +364,27 @@ func GetRowFromId(table, id string) (*tbFolder.Folder, error) {
 		}
 		fmt.Println("tampilkan satu data pertama dari tabel")
 	}
+
+	return &data, nil
+}
+
+func GetNewfolderRowFromId(id string) (*NewFolder.NewFolder, error) {
+	var data NewFolder.NewFolder
+	var errorMessage error
+	db := connection.DB
+
+	intId, err := strconv.Atoi(id)
+	if err != nil {
+		errorMessage = errors.New("invalid parameter input for 'id'")
+		return nil, errorMessage
+	}
+
+	// Ambil 1 data berdasarkan ID
+	result := db.Where("id = ?", intId).First(&data)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	fmt.Println("id query " + id)
 
 	return &data, nil
 }
@@ -255,7 +428,8 @@ func MoveRows(ids []int, sourceTable, targetTable string) model.BaseResponseMode
 			// newRows := NewFolder.NewFolder{
 			newRow := NewFolder.NewFolder{
 				Name:        row.Name, // Hanya ambil Name
-				IsCompleted: false,    // Isi nilai devault true
+				Thumbnail:   strings.Replace(row.Thumbnail, "/sementara/", "/new/", 1),
+				IsCompleted: false, // Isi nilai devault true
 			}
 
 			// COPY DATA

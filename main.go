@@ -46,11 +46,16 @@ func main() {
 
 	r := gin.Default()
 
+	r.Static("/new", "../new")
+	r.Static("/sementara", "../sementara")
+
 	r.GET("/update", folderController.UpdateAndInsert)
 	r.GET("/folders", folderController.DisplayAllDataFolder)
-	r.GET("/folder", folderController.GetDataById)
+	r.GET("/id/:id", folderController.GetDataById)
 
 	r.POST("/folders", folderController.MoveRow)
+
+	r.GET("/newFolders", folderController.DisplayDataNewfolder)
 
 	r.GET("/filteredDatas", folderController.GetFilteredData)
 

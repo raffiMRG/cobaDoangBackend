@@ -1,8 +1,10 @@
 package FolderControllers
 
 import (
+	"fmt"
 	"net/http"
 	"path/filepath"
+	"strconv"
 
 	// "strconv"
 	"strings"
@@ -58,7 +60,7 @@ func UpdateAndInsert(c *gin.Context) {
 		}
 
 		// Insert into database and collect status
-		err = FolderRepositorys.InsertFolder(db, finalFolderName)
+		err = FolderRepositorys.InsertFolder(db, finalFolderName, folder)
 		if err != nil {
 			messages = append(messages, messageStatus.Message{
 				FolderName: finalFolderName,
@@ -92,12 +94,30 @@ func DisplayAllDataFolder(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
+func DisplayDataNewfolder(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	// limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+
+	// var response model.BaseResponseModel
+
+	response := FolderRepositorys.GetAllDataNewfolders(page, 10)
+	if response.CodeResponse != 200 {
+		c.JSON(response.CodeResponse, response)
+		return
+	}
+
+	// use the parse data
+	// fmt.Printf("Recived data : %+v\n", )
+	c.JSON(http.StatusOK, response)
+}
+
 func GetDataById(c *gin.Context) {
 	var response model.BaseResponseModel
 
-	strId := c.Query("id")
+	strId := c.Param("id")
+	fmt.Println("strId:", strId)
 
-	response = FolderRepositorys.GetDataFromId("folders", strId)
+	response = FolderRepositorys.GetNewfolderDataFromId(strId)
 	if response.CodeResponse != 200 {
 		c.JSON(response.CodeResponse, response)
 		return
