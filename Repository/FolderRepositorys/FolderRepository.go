@@ -57,6 +57,9 @@ func ScanFiles(root string) ([]string, error) {
 }
 
 func InsertFolder(db *gorm.DB, folderName, folderPath string) error {
+	// Membaca variabel dari .env
+	var apiBaseUrl string = os.Getenv("API_BASEURL")
+
 	// check jika nama folder kosong
 	if folderName == "" {
 		return errors.New("folder name cannot be empty")
@@ -64,18 +67,14 @@ func InsertFolder(db *gorm.DB, folderName, folderPath string) error {
 
 	// check apakah directory ada
 	// fullPath := filepath.Join(path, folderName)
+	fmt.Println("folderPath:", folderPath)
 	files, err := os.ReadDir(folderPath)
+	// fmt.Println("files:", files)
 	if err != nil {
 		return errors.New("folder does not exist")
 	}
 
-	// fmt.Println("path : ", path)
-	// fmt.Println("folder name : ", folderName)
-	// fmt.Println("filse name : ", files[0].Name())
-
-	// thumbnailPath := filepath.Join("http://192.168.1.133:8080/sementara/", folderName, files[0].Name())
-
-	thumbnailPath, _ := url.Parse("http://192.168.1.133:8080/sementara/")
+	thumbnailPath, _ := url.Parse(apiBaseUrl + "/sementara/")
 	thumbnailPath.Path = path.Join(thumbnailPath.Path, folderName, files[0].Name())
 	fmt.Println(thumbnailPath.String())
 
@@ -477,11 +476,19 @@ func MoveRows(ids []int, sourceTable, targetTable string) model.BaseResponseMode
 				fmt.Println("masuk response success pindah data")
 			}
 
-			// // 	// 3. Hapus data dari tabel sumber
-			// var indexs []int
-			// for _, row := range rows {
-			// 	indexs = append(indexs, int(row.ID))
-			// }
+			// // 	// 3. Hapus data dari folder sumber
+			if err := os.RemoveAll(source); err != nil {
+				fmt.Println("Error:", err)
+				response = append(response, dto.InputDataRes{
+					ID:     uint(id),
+					Title:  "Delete failed",
+					Status: false,
+				})
+				continue
+			} else {
+				fmt.Println("folder sumber berhasil dihapus.")
+			}
+			// =============================
 
 			if err := tx.Table(sourceTable).Where("id = ?", row.ID).Delete(nil).Error; err != nil {
 				return fmt.Errorf("failed to delete rows from source table: %w", err)

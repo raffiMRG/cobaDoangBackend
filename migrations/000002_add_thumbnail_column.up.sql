@@ -1,5 +1,5 @@
 ALTER TABLE new_folders
-ADD COLUMN thumbnail VARCHAR(255) NULL AFTER name;
+ADD COLUMN thumbnail VARCHAR(500) NULL AFTER name;
 
 ALTER TABLE folders
-ADD COLUMN thumbnail VARCHAR(255) NULL AFTER name;
+ADD COLUMN thumbnail VARCHAR(500) NULL AFTER name;

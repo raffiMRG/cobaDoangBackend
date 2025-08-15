@@ -93,14 +93,3 @@ func copyPaste(source, destination string) error {
 
 	return nil
 }
-
-// func main() {
-// 	source := "../folder0/folder1"
-// 	destination := "../folder0/folder3"
-
-// 	if err := copyPaste(source, destination); err != nil {
-// 		fmt.Println("Error:", err)
-// 	} else {
-// 		fmt.Println("Semua file dan folder berhasil disalin.")
-// 	}
-// }

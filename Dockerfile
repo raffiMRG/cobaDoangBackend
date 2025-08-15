@@ -1,12 +1,12 @@
 # Gunakan image Golang resmi sebagai builder
-FROM golang:1.22 AS builder
+FROM golang:1.23 AS builder
 
 # Set workdir di dalam container
 WORKDIR /app
 
 # Copy file go.mod dan go.sum lalu download dependencies
 COPY go.mod go.sum ./
-RUN go mod download
+RUN go mod tidy
 
 # Copy semua file source code
 COPY . .
