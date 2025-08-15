@@ -252,6 +252,7 @@ func GetDataFromId(table, id string) model.BaseResponseModel {
 }
 
 func GetNewfolderDataFromId(id string) model.BaseResponseModel {
+	srcPath := os.Getenv("SRC_DIR")
 
 	// var query string
 	var result model.BaseResponseModel
@@ -285,7 +286,7 @@ func GetNewfolderDataFromId(id string) model.BaseResponseModel {
 		return result
 	}
 
-	scanPath := "../new/" + listData.Name
+	scanPath := srcPath + "/" + listData.Name
 	fmt.Println("Scanning path:", scanPath)
 
 	// scan folder dan ambil page
@@ -392,6 +393,8 @@ func GetNewfolderRowFromId(id string) (*NewFolder.NewFolder, error) {
 
 // func moveRows(sourceTable string, targetTable string, limit int) model.BaseResponseModel {
 func MoveRows(ids []int, sourceTable, targetTable string) model.BaseResponseModel {
+	var srcPath string = os.Getenv("SRC_DIR")
+	var destPath string = os.Getenv("DST_DIR")
 	// var result error
 	db := connection.DB
 	// var listDataSuccess []int
@@ -435,9 +438,8 @@ func MoveRows(ids []int, sourceTable, targetTable string) model.BaseResponseMode
 			// copyFailed := false
 			// for _, data := range newRows {
 
-			source := "../sementara/" + newRow.Name + "/"
-			// destination := "../folder0/folder3/"
-			destination := "../new/" + newRow.Name + "/"
+			source := srcPath + "/" + newRow.Name + "/"
+			destination := destPath + "/" + newRow.Name + "/"
 
 			if err := copyPaste(source, destination); err != nil {
 				fmt.Println("Error:", err)

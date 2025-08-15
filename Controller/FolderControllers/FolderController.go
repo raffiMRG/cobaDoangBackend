@@ -3,6 +3,7 @@ package FolderControllers
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 
@@ -22,7 +23,8 @@ import (
 )
 
 func UpdateAndInsert(c *gin.Context) {
-	root := "../sementara" // Change to your desired root directory
+
+	root := os.Getenv("SRC_DIR") // Change to your desired root directory
 
 	folders, err := FolderRepositorys.ScanFolders(root)
 	if err != nil {

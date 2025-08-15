@@ -23,8 +23,8 @@ services:
       - manga-network
     volumes:
       # - .:/app
-      - ../sementara:/sementara
-      - ../new:/new
+      - ${SRC_DIR}:/sementara
+      - ${DST_DIR}:/new
 
   mysql:
     image: mysql:8.0

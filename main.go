@@ -32,6 +32,8 @@ func main() {
 	var dbUser string = os.Getenv("DB_USER")
 	var dbPass string = os.Getenv("DB_PASS")
 	var dbName string = os.Getenv("DB_NAME")
+	var srcPath string = os.Getenv("SRC_DIR")
+	var dstPath string = os.Getenv("DST_DIR")
 
 	// fmt.Println("app port:", appPort)
 	// fmt.Println("db host:", dbHost)
@@ -60,8 +62,8 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	r.Static("/new", "../new")
-	r.Static("/sementara", "../sementara")
+	r.Static("/new", srcPath)
+	r.Static("/sementara", dstPath)
 
 	r.GET("/update", folderController.UpdateAndInsert)
 	r.GET("/folders", folderController.DisplayAllDataFolder)
