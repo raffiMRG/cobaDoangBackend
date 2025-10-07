@@ -19,6 +19,8 @@ services:
       DB_USER: ${DB_USER}
       DB_PASS: ${DB_PASS}
       DB_NAME: ${DB_NAME}
+      SRC_DIR: ${SRC_DIR}
+      DST_DIR: ${DST_DIR}
     networks:
       - manga-network
     volumes:

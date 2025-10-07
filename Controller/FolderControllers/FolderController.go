@@ -22,6 +22,34 @@ import (
 	"web_backend/Repository/FolderRepositorys"
 )
 
+func SearchFolders(c *gin.Context) {
+	keyword := c.Query("q")
+	if keyword == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Keyword is required"})
+		return
+	}
+
+	// Ambil parameter page (default: 1)
+	pageStr := c.DefaultQuery("page", "1")
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		page = 1
+	}
+
+	results, total, err := FolderRepositorys.SearchFolders(keyword, page)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"page":       page,
+		"per_page":   20,
+		"total_data": total,
+		"data":       results,
+	})
+}
+
 func UpdateAndInsert(c *gin.Context) {
 
 	root := os.Getenv("SRC_DIR") // Change to your desired root directory
@@ -84,15 +112,16 @@ func UpdateAndInsert(c *gin.Context) {
 
 func DisplayAllDataFolder(c *gin.Context) {
 	// var response model.BaseResponseModel
+	// Baca query params: ?page=2&limit=20
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
-	response := FolderRepositorys.GetAllData("folders")
+	response := FolderRepositorys.GetAllData("folders", page, limit)
 	if response.CodeResponse != 200 {
 		c.JSON(response.CodeResponse, response)
 		return
 	}
 
-	// use the parse data
-	// fmt.Printf("Recived data : %+v\n", )
 	c.JSON(http.StatusOK, response)
 }
 
@@ -102,7 +131,7 @@ func DisplayDataNewfolder(c *gin.Context) {
 
 	// var response model.BaseResponseModel
 
-	response := FolderRepositorys.GetAllDataNewfolders(page, 10)
+	response := FolderRepositorys.GetAllDataNewfolders(page, 20)
 	if response.CodeResponse != 200 {
 		c.JSON(response.CodeResponse, response)
 		return

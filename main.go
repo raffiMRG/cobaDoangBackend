@@ -62,8 +62,8 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	r.Static("/new", srcPath)
-	r.Static("/sementara", dstPath)
+	r.Static("/new", dstPath)
+	r.Static("/sementara", srcPath)
 
 	r.GET("/update", folderController.UpdateAndInsert)
 	r.GET("/folders", folderController.DisplayAllDataFolder)
@@ -74,6 +74,7 @@ func main() {
 	r.GET("/newFolders", folderController.DisplayDataNewfolder)
 
 	r.GET("/filteredDatas", folderController.GetFilteredData)
+	r.GET("/search", folderController.SearchFolders)
 
 	r.Run(":" + appPort)
 }

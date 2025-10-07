@@ -21,6 +21,31 @@ import (
 	"gorm.io/gorm"
 )
 
+func SearchFolders(keyword string, page int) ([]NewFolder.NewFolder, int64, error) {
+	var folders []NewFolder.NewFolder
+	var total int64
+
+	limit := 20
+	offset := (page - 1) * limit
+
+	query := connection.DB.Model(&NewFolder.NewFolder{})
+	if keyword != "" {
+		query = query.Where("name LIKE ?", "%"+keyword+"%")
+	}
+
+	// Hitung total data sebelum paginasi
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Ambil data dengan pagination
+	if err := query.Limit(limit).Offset(offset).Find(&folders).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return folders, total, nil
+}
+
 func ScanFolders(root string) ([]string, error) {
 	var folders []string
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
@@ -85,8 +110,51 @@ func InsertFolder(db *gorm.DB, folderName, folderPath string) error {
 	// return nil
 }
 
-func GetAllData(table string) model.BaseResponseModel {
-	var query string
+// func GetAllData(table string) model.BaseResponseModel {
+// 	var query string
+// 	var result model.BaseResponseModel
+// 	var ListData []tbFolder.Folder
+// 	db := connection.DB
+
+// 	allowedTables := map[string]bool{
+// 		"folders": true,
+// 	}
+
+// 	// Periksa apakah tabel valid
+// 	if !allowedTables[table] {
+// 		return model.BaseResponseModel{
+// 			CodeResponse:  400,
+// 			HeaderMessage: "Error",
+// 			Message:       "Invalid table name",
+// 			Data:          nil,
+// 		}
+// 	}
+
+// 	query = "SELECT * FROM folders"
+// 	tempResult := db.Raw(query).Scan(&ListData)
+// 	// fmt.Println(tempResult)
+
+// 	if tempResult.Error != nil {
+// 		result = model.BaseResponseModel{
+// 			CodeResponse:  400,
+// 			HeaderMessage: "Error",
+// 			Message:       tempResult.Error.Error(),
+// 			Data:          nil,
+// 		}
+// 	} else {
+// 		result = model.BaseResponseModel{
+// 			CodeResponse:  200,
+// 			HeaderMessage: "Success",
+// 			Message:       "Data retrieved successfully",
+// 			Data:          ListData,
+// 		}
+// 	}
+
+// 	return result
+// }
+
+// GetAllData dengan pagination
+func GetAllData(table string, page, limit int) model.BaseResponseModel {
 	var result model.BaseResponseModel
 	var ListData []tbFolder.Folder
 	db := connection.DB
@@ -95,7 +163,7 @@ func GetAllData(table string) model.BaseResponseModel {
 		"folders": true,
 	}
 
-	// Periksa apakah tabel valid
+	// Validasi table
 	if !allowedTables[table] {
 		return model.BaseResponseModel{
 			CodeResponse:  400,
@@ -105,15 +173,22 @@ func GetAllData(table string) model.BaseResponseModel {
 		}
 	}
 
-	// Buat query dengan nama tabel
-	// query = fmt.Sprintf("SELECT * FROM %s", table)
+	// Hitung offset
+	if page < 1 {
+		page = 1
+	}
+	if limit <= 0 {
+		limit = 10
+	}
+	offset := (page - 1) * limit
 
-	query = "SELECT * FROM folders"
-	// fmt.Println(query)
-	// // tempResult = db.Raw(query).Find(&ListMahasiswaList)
-	// tempResult := db.Raw(query)
-	tempResult := db.Raw(query).Scan(&ListData)
-	// fmt.Println(tempResult)
+	// Hitung total rows
+	var total int64
+	db.Table(table).Count(&total)
+
+	// Ambil data dengan limit & offset
+	query := fmt.Sprintf("SELECT * FROM %s LIMIT ? OFFSET ?", table)
+	tempResult := db.Raw(query, limit, offset).Scan(&ListData)
 
 	if tempResult.Error != nil {
 		result = model.BaseResponseModel{
@@ -123,11 +198,20 @@ func GetAllData(table string) model.BaseResponseModel {
 			Data:          nil,
 		}
 	} else {
+		// Bungkus data + pagination
 		result = model.BaseResponseModel{
 			CodeResponse:  200,
 			HeaderMessage: "Success",
 			Message:       "Data retrieved successfully",
-			Data:          ListData,
+			Data: map[string]interface{}{
+				"items": ListData,
+				"pagination": map[string]interface{}{
+					"total": total,
+					"page":  page,
+					"limit": limit,
+					"pages": int((total + int64(limit) - 1) / int64(limit)), // ceiling
+				},
+			},
 		}
 	}
 
@@ -252,7 +336,7 @@ func GetDataFromId(table, id string) model.BaseResponseModel {
 }
 
 func GetNewfolderDataFromId(id string) model.BaseResponseModel {
-	srcPath := os.Getenv("SRC_DIR")
+	dstPath := os.Getenv("DST_DIR")
 
 	// var query string
 	var result model.BaseResponseModel
@@ -286,7 +370,7 @@ func GetNewfolderDataFromId(id string) model.BaseResponseModel {
 		return result
 	}
 
-	scanPath := srcPath + "/" + listData.Name
+	scanPath := dstPath + "/" + listData.Name
 	fmt.Println("Scanning path:", scanPath)
 
 	// scan folder dan ambil page
