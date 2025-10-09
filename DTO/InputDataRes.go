@@ -11,10 +11,11 @@ type InputDataRes struct {
 }
 
 type NewFolderResponse struct {
-	ID          int       `json:"id"`
-	Name        string    `json:"name"`
-	Thumbnail   string    `json:"thumbnail"`
-	IsCompleted bool      `json:"is_completed"`
-	CreateAt    time.Time `json:"create_at"`
-	Page        []string  `json:"page"`
+	ID           int       `json:"id"`
+	Name         string    `json:"name"`
+	Thumbnail    string    `json:"thumbnail"`
+	IsCompleted  bool      `json:"is_completed"`
+	CreateAt     time.Time `json:"create_at"`
+	Page         []string  `json:"page"`
+	IsBookmarked bool      `json:"is_bookmarked"`
 }

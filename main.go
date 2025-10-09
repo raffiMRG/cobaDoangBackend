@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 
+	Bookmarkcontroller "web_backend/Controller/BookmarkController"
 	folderController "web_backend/Controller/FolderControllers"
 	conn "web_backend/Model/Connection"
 )
@@ -75,6 +76,14 @@ func main() {
 
 	r.GET("/filteredDatas", folderController.GetFilteredData)
 	r.GET("/search", folderController.SearchFolders)
+
+	bookmarks := r.Group("/bookmarks")
+	{
+		bookmarks.GET("", Bookmarkcontroller.GetBookmarks)
+		bookmarks.GET("/:id", Bookmarkcontroller.GetBookmark)
+		bookmarks.POST("", Bookmarkcontroller.ToggleBookmark)
+		bookmarks.DELETE("/:id", Bookmarkcontroller.DeleteBookmark)
+	}
 
 	r.Run(":" + appPort)
 }

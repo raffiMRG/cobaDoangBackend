@@ -220,7 +220,8 @@ func GetAllData(table string, page, limit int) model.BaseResponseModel {
 
 func GetAllDataNewfolders(page, limit int) model.BaseResponseModel {
 	var result model.BaseResponseModel
-	var listData []NewFolder.NewFolder
+	// var listData []NewFolder.NewFolder
+	var listData []dto.NewFolderResponse
 	db := connection.DB
 
 	// Hitung offset untuk pagination
@@ -237,10 +238,18 @@ func GetAllDataNewfolders(page, limit int) model.BaseResponseModel {
 	db.Model(&NewFolder.NewFolder{}).Count(&total)
 
 	// Ambil data dengan limit & offset
-	err := db.Table("new_folders").
+	err := db.Table("new_folders nf").
+		Select(`
+			nf.id,
+			nf.name,
+			nf.thumbnail,
+			nf.is_completed,
+			nf.create_at,
+			EXISTS (SELECT 1 FROM bookmarks b WHERE b.folder_id = nf.id) AS is_bookmarked
+		`).
+		Order("nf.id DESC").
 		Limit(limit).
 		Offset(offset).
-		Order("id DESC").
 		Find(&listData).Error
 
 	if err != nil {
