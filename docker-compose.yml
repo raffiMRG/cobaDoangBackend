@@ -1,4 +1,4 @@
-version: '3.8'
+# version: '3.8'
 
 services:
   app:
@@ -9,10 +9,10 @@ services:
       mysql:
         condition: service_healthy
     ports:
-      - "8080:8080"
+      - "${APP_PORT}:${APP_PORT}"
     environment:
       DB_APP_HOST: ${DB_APP_HOST}
-      APP_ADDRESS: ${APP_ADDRESS}
+      API_BASEURL: ${API_BASEURL}
       APP_PORT: ${APP_PORT}
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}

@@ -19,3 +19,12 @@ type NewFolderResponse struct {
 	Page         []string  `json:"page"`
 	IsBookmarked bool      `json:"is_bookmarked"`
 }
+
+type NewFolderQuery struct {
+	ID           int       `gorm:"column:id"`
+	Name         string    `gorm:"column:name"`
+	Thumbnail    string    `gorm:"column:thumbnail"`
+	IsCompleted  bool      `gorm:"column:is_completed"`
+	CreateAt     time.Time `gorm:"column:create_at"`
+	IsBookmarked bool      `gorm:"column:is_bookmarked"`
+}
