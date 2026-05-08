@@ -20,7 +20,40 @@ import (
 func main() {
 	var err error
 
+	// // Tentukan environment
+	// env := os.Getenv("APP_ENV")
+	// if env == "" {
+	// 	env = "development" // default
+	// }
+
+	// // Tentukan file env
+	// envFile := ".env." + env
+
+	// // Load env file
+	// err = godotenv.Load(envFile)
+	// if err != nil {
+	// 	fmt.Printf("Warning: could not load %s file: %v\n", envFile, err)
+	// }
+
+	// fmt.Println("Running in:", env)
+
+	// // Ambil environment variables
+	// appPort := os.Getenv("APP_PORT")
+	// dbHost := os.Getenv("DB_APP_HOST")
+	// dbPort := os.Getenv("DB_PORT")
+	// dbUser := os.Getenv("DB_USER")
+	// dbPass := os.Getenv("DB_PASS")
+	// dbName := os.Getenv("DB_NAME")
+	// srcPath := os.Getenv("SRC_DIR")
+	// dstPath := os.Getenv("DST_DIR")
+
+	// // Debug (opsional)
+	// fmt.Println("App Port:", appPort)
+	// fmt.Println("DB Host:", dbHost)
+
+	// ========================
 	// Memuat file .env
+	// err = godotenv.Load(".env.development")
 	err = godotenv.Load()
 	if err != nil {
 		fmt.Printf("Error loading .env file: %v", err)
@@ -36,12 +69,12 @@ func main() {
 	var srcPath string = os.Getenv("SRC_DIR")
 	var dstPath string = os.Getenv("DST_DIR")
 
-	// fmt.Println("app port:", appPort)
-	// fmt.Println("db host:", dbHost)
-	// fmt.Println("db port:", dbPort)
-	// fmt.Println("db user:", dbUser)
-	// fmt.Println("db pass:", dbPass)
-	// fmt.Println("db name:", dbName)
+	fmt.Println("app port:", appPort)
+	fmt.Println("db host:", dbHost)
+	fmt.Println("db port:", dbPort)
+	fmt.Println("db user:", dbUser)
+	fmt.Println("db pass:", dbPass)
+	fmt.Println("db name:", dbName)
 
 	// Koneksi ke MySQL
 	_, err = conn.ConnectMySQL(dbUser, dbPass, dbHost, dbPort, dbName)
@@ -70,7 +103,9 @@ func main() {
 	r.GET("/folders", folderController.DisplayAllDataFolder)
 	r.GET("/id/:id", folderController.GetDataById)
 
-	r.POST("/folders", folderController.MoveRow)
+	// r.POST("/folders", folderController.MoveRow)
+	r.POST("/folders", folderController.MoveRowAndTrack)
+	r.GET("/folders/progress/:taskID", folderController.FolderProgress)
 
 	r.GET("/newFolders", folderController.DisplayDataNewfolder)
 
