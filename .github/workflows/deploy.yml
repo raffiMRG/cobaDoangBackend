@@ -51,14 +51,14 @@ jobs:
 
     steps:
       - name: Go to app directory
-        run: cd /path/project
+        run: cd /home/mrg/code/build
 
       - name: Pull latest image
         run: |
-          cd /path/project
+          cd /home/mrg/code/build
           docker compose pull
 
       - name: Restart containers
         run: |
-          cd /path/project
+          cd /home/mrg/code/build
           docker compose up -d
