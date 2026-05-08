@@ -69,12 +69,12 @@ func main() {
 	var srcPath string = os.Getenv("SRC_DIR")
 	var dstPath string = os.Getenv("DST_DIR")
 
-	fmt.Println("app port:", appPort)
-	fmt.Println("db host:", dbHost)
-	fmt.Println("db port:", dbPort)
-	fmt.Println("db user:", dbUser)
-	fmt.Println("db pass:", dbPass)
-	fmt.Println("db name:", dbName)
+	// fmt.Println("app port:", appPort)
+	// fmt.Println("db host:", dbHost)
+	// fmt.Println("db port:", dbPort)
+	// fmt.Println("db user:", dbUser)
+	// fmt.Println("db pass:", dbPass)
+	// fmt.Println("db name:", dbName)
 
 	// Koneksi ke MySQL
 	_, err = conn.ConnectMySQL(dbUser, dbPass, dbHost, dbPort, dbName)
