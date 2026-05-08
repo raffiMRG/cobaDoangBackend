@@ -6,11 +6,13 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	// "strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	dto "web_backend/DTO"
 	model "web_backend/Model"
@@ -157,7 +159,6 @@ func GetDataById(c *gin.Context) {
 }
 
 func MoveRow(c *gin.Context) {
-	// var request tbFolder.Folder
 	var request dto.InputDataReq
 	var response model.BaseResponseModel
 
@@ -172,26 +173,87 @@ func MoveRow(c *gin.Context) {
 		return
 	}
 
-	// for _, ID := range request.IDS{
-	// func MoveRows(sourceTable string, targetTable string) model.BaseResponseModel {
 	response = FolderRepositorys.MoveRows(request.IDS, "folders", "new_folders")
-	// response = FolderRepositorys.MoveRows(int(ID), "folders", "new_folder")
 	if response.CodeResponse != 200 {
 		c.JSON(response.CodeResponse, response)
 		return
 	}
-	// }
-
 	c.JSON(http.StatusOK, response)
 }
 
+func MoveRowAndTrack(c *gin.Context) {
+	var request dto.InputDataReq
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, model.BaseResponseModel{
+			CodeResponse:  400,
+			HeaderMessage: "Bad Request",
+			Message:       err.Error(),
+			Data:          nil,
+		})
+		return
+	}
+
+	// buat ID unik untuk tracking progress
+	taskID := uuid.New().String()
+
+	// Jalankan proses pemindahan di background
+	go FolderRepositorys.MoveRowsWithProgress(taskID, request.IDS, "folders", "new_folders")
+
+	// kirim response taskID ke frontend
+	c.JSON(http.StatusOK, model.BaseResponseModel{
+		CodeResponse:  200,
+		HeaderMessage: "Accepted",
+		Message:       "Proses pemindahan dimulai",
+		Data: map[string]string{
+			"task_id": taskID,
+		},
+	})
+}
+
+func FolderProgress(c *gin.Context) {
+	taskID := c.Param("taskID")
+
+	// === 1️⃣ Set header SSE lengkap ===
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	c.Writer.Header().Set("Transfer-Encoding", "chunked")
+	c.Writer.Header().Set("Access-Control-Allow-Origin", "*") // penting kalau beda domain/port
+
+	// === 2️⃣ Pastikan flusher tersedia ===
+	flusher, ok := c.Writer.(http.Flusher)
+	if !ok {
+		http.Error(c.Writer, "Streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+
+	// === 3️⃣ Loop kirim progres ke client ===
+	for {
+		val, ok := FolderRepositorys.ProgressMap.Load(taskID)
+		if ok {
+			progress := val.(float64)
+
+			// gunakan format event standar SSE
+			fmt.Fprintf(c.Writer, "event: progress\ndata: %.2f\n\n", progress)
+			flusher.Flush()
+
+			if progress >= 100 {
+				fmt.Fprintf(c.Writer, "event: done\ndata: Completed\n\n")
+				flusher.Flush()
+				FolderRepositorys.ProgressMap.Delete(taskID)
+				break
+			}
+		}
+
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	// === 4️⃣ Pastikan koneksi ditutup dengan rapi ===
+	c.Writer.Write([]byte("event: close\ndata: Connection closed\n\n"))
+	flusher.Flush()
+}
 func GetFilteredData(c *gin.Context) {
-	// var response model.BaseResponseModel
-
-	// strId := c.Query("id")
-
 	response := FolderRepositorys.FilteredData("folders", "new_folder")
-	// response := FolderRepositorys.GetDataFromId("folders", strId)
 	if response.CodeResponse != 200 {
 		c.JSON(response.CodeResponse, response)
 		return

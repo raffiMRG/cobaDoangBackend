@@ -18,32 +18,66 @@ import (
 	model "web_backend/Model"
 	connection "web_backend/Model/Connection"
 
+	"sync"
+
 	"gorm.io/gorm"
 )
 
-func SearchFolders(keyword string, page int) ([]NewFolder.NewFolder, int64, error) {
-	var folders []NewFolder.NewFolder
-	var total int64
+var ProgressMap sync.Map
+
+// func SearchFolders(keyword string, page int) ([]NewFolder.NewFolder, int64, error) {
+func SearchFolders(keyword string, page int) ([]dto.NewFolderQuery, int64, error) {
+	// var folders []NewFolder.NewFolder
+	// var folders []dto.NewFolderResponse
+	var foldersQuery []dto.NewFolderQuery
+	// var total int64
 
 	limit := 20
 	offset := (page - 1) * limit
 
-	query := connection.DB.Model(&NewFolder.NewFolder{})
-	if keyword != "" {
-		query = query.Where("name LIKE ?", "%"+keyword+"%")
-	}
+	// ==== Query lama start ====
+	// query := connection.DB.Model(&NewFolder.NewFolder{})
+	// if keyword != "" {
+	// 	query = query.Where("name LIKE ?", "%"+keyword+"%")
+	// }
 
-	// Hitung total data sebelum paginasi
-	if err := query.Count(&total).Error; err != nil {
+	// // Hitung total data sebelum paginasi
+	// if err := query.Count(&total).Error; err != nil {
+	// 	return nil, 0, err
+	// }
+
+	// // Ambil data dengan pagination
+	// if err := query.Limit(limit).Offset(offset).Find(&folders).Error; err != nil {
+	// 	return nil, 0, err
+	// }
+	// ==== Query lama end ====
+
+	// ==== Query data baru start ====
+	// Ambil data dengan limit & offset
+	err := connection.DB.Table("new_folders nf").
+		Select(`
+			nf.id,
+			nf.name,
+			nf.thumbnail,
+			nf.is_completed,
+			nf.create_at,
+			EXISTS (SELECT 1 FROM bookmarks b WHERE b.folder_id = nf.id) AS is_bookmarked
+		`).
+		Where("nf.name LIKE ?", "%"+keyword+"%").
+		Order("nf.id DESC").
+		Limit(limit).
+		Offset(offset).
+		Scan(&foldersQuery).Error
+	// Find(&folders).Error
+	// ==== Query data baru end ====
+
+	if err != nil {
 		return nil, 0, err
 	}
 
-	// Ambil data dengan pagination
-	if err := query.Limit(limit).Offset(offset).Find(&folders).Error; err != nil {
-		return nil, 0, err
-	}
-
-	return folders, total, nil
+	// return folders, total, nil
+	// fmt.Println("total data:", int64(len(folders)))
+	return foldersQuery, int64(len(foldersQuery)), nil
 }
 
 func ScanFolders(root string) ([]string, error) {
@@ -110,50 +144,6 @@ func InsertFolder(db *gorm.DB, folderName, folderPath string) error {
 	// return nil
 }
 
-// func GetAllData(table string) model.BaseResponseModel {
-// 	var query string
-// 	var result model.BaseResponseModel
-// 	var ListData []tbFolder.Folder
-// 	db := connection.DB
-
-// 	allowedTables := map[string]bool{
-// 		"folders": true,
-// 	}
-
-// 	// Periksa apakah tabel valid
-// 	if !allowedTables[table] {
-// 		return model.BaseResponseModel{
-// 			CodeResponse:  400,
-// 			HeaderMessage: "Error",
-// 			Message:       "Invalid table name",
-// 			Data:          nil,
-// 		}
-// 	}
-
-// 	query = "SELECT * FROM folders"
-// 	tempResult := db.Raw(query).Scan(&ListData)
-// 	// fmt.Println(tempResult)
-
-// 	if tempResult.Error != nil {
-// 		result = model.BaseResponseModel{
-// 			CodeResponse:  400,
-// 			HeaderMessage: "Error",
-// 			Message:       tempResult.Error.Error(),
-// 			Data:          nil,
-// 		}
-// 	} else {
-// 		result = model.BaseResponseModel{
-// 			CodeResponse:  200,
-// 			HeaderMessage: "Success",
-// 			Message:       "Data retrieved successfully",
-// 			Data:          ListData,
-// 		}
-// 	}
-
-// 	return result
-// }
-
-// GetAllData dengan pagination
 func GetAllData(table string, page, limit int) model.BaseResponseModel {
 	var result model.BaseResponseModel
 	var ListData []tbFolder.Folder
@@ -612,6 +602,55 @@ func MoveRows(ids []int, sourceTable, targetTable string) model.BaseResponseMode
 		}
 		return successResult
 	}
+}
+
+func MoveRowsWithProgress(taskID string, ids []int, sourceTable, targetTable string) {
+	var srcPath = os.Getenv("SRC_DIR")
+	var destPath = os.Getenv("DST_DIR")
+
+	db := connection.DB
+	total := len(ids)
+	if total == 0 {
+		ProgressMap.Store(taskID, 100.0)
+		return
+	}
+
+	_ = db.Transaction(func(tx *gorm.DB) error {
+		for i, id := range ids {
+			// ===== PROSES PINDAH SAMA SEPERTI MoveRows =====
+			if id < 0 {
+				continue
+			}
+
+			strId := strconv.Itoa(id)
+			row, err := GetRowFromId(sourceTable, strId)
+			if err != nil || row == nil {
+				continue
+			}
+
+			newRow := NewFolder.NewFolder{
+				Name:        row.Name,
+				Thumbnail:   strings.Replace(row.Thumbnail, "/sementara/", "/new/", 1),
+				IsCompleted: false,
+			}
+
+			source := srcPath + "/" + newRow.Name + "/"
+			destination := destPath + "/" + newRow.Name + "/"
+
+			_ = copyPaste(source, destination)
+			_ = tx.Table(targetTable).Create(&newRow).Error
+			_ = os.RemoveAll(source)
+			_ = tx.Table(sourceTable).Where("id = ?", row.ID).Delete(nil).Error
+
+			// ===== UPDATE PROGRESS =====
+			progress := (float64(i+1) / float64(total)) * 100
+			ProgressMap.Store(taskID, progress)
+		}
+
+		// Pastikan selesai 100%
+		ProgressMap.Store(taskID, 100.0)
+		return nil
+	})
 }
 
 func FilteredData(table, table2 string) model.BaseResponseModel {
