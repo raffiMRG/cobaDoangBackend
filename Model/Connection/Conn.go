@@ -12,7 +12,7 @@ var DB *gorm.DB
 func ConnectMySQL(username, password, host, port, name string) (*gorm.DB, error) {
 	// Format DSN (Data Source Name)
 	dsn := username + ":" + password + "@tcp(" + host + ":" + port + ")/" + name + "?charset=utf8mb4&parseTime=True&loc=Local"
-	fmt.Println("Connecting to MySQL with DSN:", dsn)
+	fmt.Printf("Connecting to MySQL: %s@tcp(%s:%s)/%s\n", username, host, port, name)
 	// Membuka koneksi
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
