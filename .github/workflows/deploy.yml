@@ -51,14 +51,21 @@ jobs:
 
     steps:
       - name: Go to app directory
-        run: cd /home/mrg/code/build
+        # run: cd /home/mrg/code/build
+        run: cd /home/mrg/code/manga/be-build
 
       - name: Pull latest image
+        # run: |
+        #   cd /home/mrg/code/build
+        #   docker compose pull
         run: |
-          cd /home/mrg/code/build
+          cd /home/mrg/code/manga/be-build
           docker compose pull
 
       - name: Restart containers
+        # run: |
+        #   cd /home/mrg/code/build
+        #   docker compose up -d
         run: |
-          cd /home/mrg/code/build
+          cd /home/mrg/code/manga/be-build
           docker compose up -d

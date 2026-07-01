@@ -4,6 +4,7 @@ import (
 	// "fmt"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
@@ -98,6 +99,10 @@ func main() {
 
 	r.Static("/new", dstPath)
 	r.Static("/sementara", srcPath)
+
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
 
 	r.GET("/update", folderController.UpdateAndInsert)
 	r.GET("/folders", folderController.DisplayAllDataFolder)
