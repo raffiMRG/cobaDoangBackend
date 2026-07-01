@@ -19,8 +19,9 @@ services:
       DB_USER: ${DB_USER}
       DB_PASS: ${DB_PASS}
       DB_NAME: ${DB_NAME}
-      SRC_DIR: ${SRC_DIR}
-      DST_DIR: ${DST_DIR}
+      SRC_DIR: /sementara
+      DST_DIR: /new
+      JWT_SECRET: ${JWT_SECRET}
     networks:
       - manga-network
     volumes:

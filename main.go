@@ -2,6 +2,7 @@ package main
 
 import (
 	// "fmt"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -13,9 +14,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 
+	AuthController "web_backend/Controller/AuthController"
+	BackupController "web_backend/Controller/BackupController"
 	Bookmarkcontroller "web_backend/Controller/BookmarkController"
 	folderController "web_backend/Controller/FolderControllers"
+	"web_backend/Middleware"
 	conn "web_backend/Model/Connection"
+	"web_backend/Repository/AuthRepositorys"
 )
 
 func main() {
@@ -60,6 +65,9 @@ func main() {
 		fmt.Printf("Error loading .env file: %v", err)
 	}
 
+	createUserFlag := flag.String("create-user", "", "username for a one-off admin user to create, then exit")
+	flag.Parse()
+
 	// Membaca variabel dari lingkungan
 	var appPort string = os.Getenv("APP_PORT")
 	var dbHost string = os.Getenv("DB_APP_HOST")
@@ -84,6 +92,25 @@ func main() {
 		log.Fatal("Failed to connect to the database:", err)
 	}
 
+	// One-off admin bootstrap: `./app --create-user <username> <password>`
+	// creates the user then exits, without ever exposing a public
+	// registration endpoint.
+	if *createUserFlag != "" {
+		args := flag.Args()
+		if len(args) < 1 {
+			log.Fatal("usage: app --create-user <username> <password>")
+		}
+		if err := AuthRepositorys.CreateUser(conn.DB, *createUserFlag, args[0]); err != nil {
+			log.Fatal("Failed to create user:", err)
+		}
+		fmt.Println("User created successfully:", *createUserFlag)
+		return
+	}
+
+	if os.Getenv("JWT_SECRET") == "" {
+		log.Fatal("JWT_SECRET environment variable is required")
+	}
+
 	r := gin.Default()
 
 	// Atur middleware CORS
@@ -97,6 +124,8 @@ func main() {
 		MaxAge:           12 * time.Hour,
 	}))
 
+	// Thumbnails served as plain <img src> by the frontend — can't carry a
+	// Bearer header, so these stay public unlike the JSON/API routes below.
 	r.Static("/new", dstPath)
 	r.Static("/sementara", srcPath)
 
@@ -104,25 +133,37 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
-	r.GET("/update", folderController.UpdateAndInsert)
-	r.GET("/folders", folderController.DisplayAllDataFolder)
-	r.GET("/id/:id", folderController.GetDataById)
+	r.POST("/login", AuthController.Login)
+	r.POST("/refresh", AuthController.Refresh)
 
-	// r.POST("/folders", folderController.MoveRow)
-	r.POST("/folders", folderController.MoveRowAndTrack)
-	r.GET("/folders/progress/:taskID", folderController.FolderProgress)
-
-	r.GET("/newFolders", folderController.DisplayDataNewfolder)
-
-	r.GET("/filteredDatas", folderController.GetFilteredData)
-	r.GET("/search", folderController.SearchFolders)
-
-	bookmarks := r.Group("/bookmarks")
+	protected := r.Group("")
+	protected.Use(Middleware.RequireAuth())
 	{
-		bookmarks.GET("", Bookmarkcontroller.GetBookmarks)
-		bookmarks.GET("/:id", Bookmarkcontroller.GetBookmark)
-		bookmarks.POST("", Bookmarkcontroller.ToggleBookmark)
-		bookmarks.DELETE("/:id", Bookmarkcontroller.DeleteBookmark)
+		protected.POST("/logout", AuthController.Logout)
+
+		protected.GET("/update", folderController.UpdateAndInsert)
+		protected.GET("/folders", folderController.DisplayAllDataFolder)
+		protected.GET("/id/:id", folderController.GetDataById)
+
+		// protected.POST("/folders", folderController.MoveRow)
+		protected.POST("/folders", folderController.MoveRowAndTrack)
+		protected.GET("/folders/progress/:taskID", folderController.FolderProgress)
+
+		protected.GET("/newFolders", folderController.DisplayDataNewfolder)
+
+		protected.GET("/filteredDatas", folderController.GetFilteredData)
+		protected.GET("/search", folderController.SearchFolders)
+
+		bookmarks := protected.Group("/bookmarks")
+		{
+			bookmarks.GET("", Bookmarkcontroller.GetBookmarks)
+			bookmarks.GET("/:id", Bookmarkcontroller.GetBookmark)
+			bookmarks.POST("", Bookmarkcontroller.ToggleBookmark)
+			bookmarks.DELETE("/:id", Bookmarkcontroller.DeleteBookmark)
+		}
+
+		protected.GET("/export", BackupController.Export)
+		protected.POST("/import", BackupController.Import)
 	}
 
 	r.Run(":" + appPort)
