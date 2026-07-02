@@ -206,10 +206,21 @@ func exportBookmarks(db *gorm.DB, sb *strings.Builder) error {
 func ImportDatabase(db *gorm.DB, sqlContent string) error {
 	statements := strings.Split(sqlContent, ";\n")
 
-	return db.Transaction(func(tx *gorm.DB) error {
+	err := db.Transaction(func(tx *gorm.DB) error {
 		for _, stmt := range statements {
 			trimmed := strings.TrimSpace(stmt)
 			if trimmed == "" {
+				continue
+			}
+			// LOCK TABLES is session-scoped in MySQL: if a foreign dump
+			// (e.g. a raw mysqldump, not our own ExportDatabase output)
+			// locks tables and then a later statement fails, the pooled
+			// connection is left locked and every subsequent query on it
+			// errors with "table was not locked" until the connection is
+			// discarded — effectively breaking the whole app. We never
+			// need table locking for this import model, so drop it.
+			upper := strings.ToUpper(trimmed)
+			if strings.HasPrefix(upper, "LOCK TABLES") || strings.HasPrefix(upper, "UNLOCK TABLES") {
 				continue
 			}
 			if err := tx.Exec(trimmed).Error; err != nil {
@@ -218,4 +229,11 @@ func ImportDatabase(db *gorm.DB, sqlContent string) error {
 		}
 		return nil
 	})
+
+	// Safety net: if anything on this connection ended up locked despite
+	// the filtering above, release it before returning so the connection
+	// is safe to reuse from the pool.
+	db.Exec("UNLOCK TABLES")
+
+	return err
 }
