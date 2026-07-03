@@ -524,7 +524,7 @@ func MoveRows(ids []int, sourceTable, targetTable string) model.BaseResponseMode
 			source := srcPath + "/" + newRow.Name + "/"
 			destination := destPath + "/" + newRow.Name + "/"
 
-			if err := copyPaste(source, destination); err != nil {
+			if err := copyPaste(source, destination, nil); err != nil {
 				fmt.Println("Error:", err)
 				// copyFailed = true
 				response = append(response, dto.InputDataRes{
@@ -615,8 +615,36 @@ func MoveRowsWithProgress(taskID string, ids []int, sourceTable, targetTable str
 		return
 	}
 
+	// Hitung total file di semua folder yang dipilih lebih dulu, supaya
+	// progress bisa dilaporkan per-file, bukan cuma per-folder. Tanpa ini
+	// progress diam di 0% sepanjang waktu penyalinan satu folder (bisa berisi
+	// puluhan halaman manga) lalu lompat langsung ke persentase berikutnya
+	// begitu folder itu selesai total.
+	totalFiles := 0
+	for _, id := range ids {
+		if id < 0 {
+			continue
+		}
+		row, err := GetRowFromId(sourceTable, strconv.Itoa(id))
+		if err != nil || row == nil {
+			continue
+		}
+		source := srcPath + "/" + row.Name + "/"
+		if files, err := ScanFiles(source); err == nil {
+			totalFiles += len(files)
+		}
+	}
+
+	filesCopied := 0
+	onFileDone := func() {
+		filesCopied++
+		if totalFiles > 0 {
+			ProgressMap.Store(taskID, (float64(filesCopied)/float64(totalFiles))*100)
+		}
+	}
+
 	_ = db.Transaction(func(tx *gorm.DB) error {
-		for i, id := range ids {
+		for _, id := range ids {
 			// ===== PROSES PINDAH SAMA SEPERTI MoveRows =====
 			if id < 0 {
 				continue
@@ -637,14 +665,10 @@ func MoveRowsWithProgress(taskID string, ids []int, sourceTable, targetTable str
 			source := srcPath + "/" + newRow.Name + "/"
 			destination := destPath + "/" + newRow.Name + "/"
 
-			_ = copyPaste(source, destination)
+			_ = copyPaste(source, destination, onFileDone)
 			_ = tx.Table(targetTable).Create(&newRow).Error
 			_ = os.RemoveAll(source)
 			_ = tx.Table(sourceTable).Where("id = ?", row.ID).Delete(nil).Error
-
-			// ===== UPDATE PROGRESS =====
-			progress := (float64(i+1) / float64(total)) * 100
-			ProgressMap.Store(taskID, progress)
 		}
 
 		// Pastikan selesai 100%

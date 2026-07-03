@@ -7,7 +7,11 @@ import (
 	"path/filepath"
 )
 
-func copyFile(src, dst string) error {
+// onFileDone, when non-nil, is called once after each individual file finishes
+// copying (not per directory) — used by MoveRowsWithProgress to report
+// per-file progress instead of only once a whole folder is done.
+
+func copyFile(src, dst string, onFileDone func()) error {
 	srcFile, err := os.Open(src)
 	if err != nil {
 		return fmt.Errorf("gagal membuka file sumber %s: %v", src, err)
@@ -25,10 +29,14 @@ func copyFile(src, dst string) error {
 		return fmt.Errorf("gagal menyalin data dari %s ke %s: %v", src, dst, err)
 	}
 
+	if onFileDone != nil {
+		onFileDone()
+	}
+
 	return nil
 }
 
-func copyDir(src, dst string) error {
+func copyDir(src, dst string, onFileDone func()) error {
 	entries, err := os.ReadDir(src)
 	if err != nil {
 		return fmt.Errorf("gagal membaca direktori sumber %s: %v", src, err)
@@ -47,12 +55,12 @@ func copyDir(src, dst string) error {
 
 		if entry.IsDir() {
 			// Rekursif untuk direktori
-			if err := copyDir(srcPath, destPath); err != nil {
+			if err := copyDir(srcPath, destPath, onFileDone); err != nil {
 				return err
 			}
 		} else {
 			// Salin file
-			if err := copyFile(srcPath, destPath); err != nil {
+			if err := copyFile(srcPath, destPath, onFileDone); err != nil {
 				return err
 			}
 		}
@@ -61,7 +69,7 @@ func copyDir(src, dst string) error {
 	return nil
 }
 
-func copyPaste(source, destination string) error {
+func copyPaste(source, destination string, onFileDone func()) error {
 	entries, err := os.ReadDir(source)
 	if err != nil {
 		return fmt.Errorf("gagal membaca direktori sumber: %v", err)
@@ -78,12 +86,12 @@ func copyPaste(source, destination string) error {
 
 		if entry.IsDir() {
 			// Salin direktori
-			if err := copyDir(srcPath, destPath); err != nil {
+			if err := copyDir(srcPath, destPath, onFileDone); err != nil {
 				return fmt.Errorf("gagal menyalin direktori %s ke %s: %v", srcPath, destPath, err)
 			}
 		} else {
 			// Salin file
-			if err := copyFile(srcPath, destPath); err != nil {
+			if err := copyFile(srcPath, destPath, onFileDone); err != nil {
 				return fmt.Errorf("gagal menyalin file %s ke %s: %v", srcPath, destPath, err)
 			}
 		}
