@@ -21,10 +21,10 @@ type NewFolderResponse struct {
 }
 
 type NewFolderQuery struct {
-	ID           int       `gorm:"column:id"`
-	Name         string    `gorm:"column:name"`
-	Thumbnail    string    `gorm:"column:thumbnail"`
-	IsCompleted  bool      `gorm:"column:is_completed"`
-	CreateAt     time.Time `gorm:"column:create_at"`
-	IsBookmarked bool      `gorm:"column:is_bookmarked"`
+	ID           int       `gorm:"column:id" json:"id"`
+	Name         string    `gorm:"column:name" json:"name"`
+	Thumbnail    string    `gorm:"column:thumbnail" json:"thumbnail"`
+	IsCompleted  bool      `gorm:"column:is_completed" json:"is_completed"`
+	CreateAt     time.Time `gorm:"column:create_at" json:"create_at"`
+	IsBookmarked bool      `gorm:"column:is_bookmarked" json:"is_bookmarked"`
 }
