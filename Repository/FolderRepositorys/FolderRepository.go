@@ -23,7 +23,14 @@ import (
 	"gorm.io/gorm"
 )
 
-var ProgressMap sync.Map
+// ProgressChannels maps a move taskID to a chan float64 that receives a new
+// percentage the instant a file finishes copying — push-based rather than
+// polled, so progress shows up in real time regardless of how fast the copy
+// is. Only one reader is expected per taskID (a single SSE connection); if
+// multiple listeners ever connect to the same taskID concurrently, updates
+// would be split between them rather than broadcast, since this is a
+// personal single-user app and that scenario isn't expected in practice.
+var ProgressChannels sync.Map
 
 // func SearchFolders(keyword string, page int) ([]NewFolder.NewFolder, int64, error) {
 func SearchFolders(keyword string, page int) ([]dto.NewFolderQuery, int64, error) {
@@ -610,10 +617,6 @@ func MoveRowsWithProgress(taskID string, ids []int, sourceTable, targetTable str
 
 	db := connection.DB
 	total := len(ids)
-	if total == 0 {
-		ProgressMap.Store(taskID, 100.0)
-		return
-	}
 
 	// Hitung total file di semua folder yang dipilih lebih dulu, supaya
 	// progress bisa dilaporkan per-file, bukan cuma per-folder. Tanpa ini
@@ -635,12 +638,23 @@ func MoveRowsWithProgress(taskID string, ids []int, sourceTable, targetTable str
 		}
 	}
 
+	// Buffered sebesar totalFiles+1 supaya penyalinan file TIDAK PERNAH
+	// menunggu SSE handler membaca — kalau browser belum sempat connect
+	// (atau tidak connect sama sekali), update tetap antre di channel dan
+	// langsung "mengejar" begitu listener terhubung, bukan hilang/nge-block.
+	progressChan := make(chan float64, totalFiles+1)
+	ProgressChannels.Store(taskID, progressChan)
+	defer close(progressChan)
+
+	if total == 0 || totalFiles == 0 {
+		progressChan <- 100.0
+		return
+	}
+
 	filesCopied := 0
 	onFileDone := func() {
 		filesCopied++
-		if totalFiles > 0 {
-			ProgressMap.Store(taskID, (float64(filesCopied)/float64(totalFiles))*100)
-		}
+		progressChan <- (float64(filesCopied) / float64(totalFiles)) * 100
 	}
 
 	_ = db.Transaction(func(tx *gorm.DB) error {
@@ -672,7 +686,7 @@ func MoveRowsWithProgress(taskID string, ids []int, sourceTable, targetTable str
 		}
 
 		// Pastikan selesai 100%
-		ProgressMap.Store(taskID, 100.0)
+		progressChan <- 100.0
 		return nil
 	})
 }

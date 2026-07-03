@@ -227,28 +227,38 @@ func FolderProgress(c *gin.Context) {
 		return
 	}
 
-	// === 3️⃣ Loop kirim progres ke client ===
-	for {
-		val, ok := FolderRepositorys.ProgressMap.Load(taskID)
-		if ok {
-			progress := val.(float64)
-
-			// gunakan format event standar SSE
-			fmt.Fprintf(c.Writer, "event: progress\ndata: %.2f\n\n", progress)
-			flusher.Flush()
-
-			if progress >= 100 {
-				fmt.Fprintf(c.Writer, "event: done\ndata: Completed\n\n")
-				flusher.Flush()
-				FolderRepositorys.ProgressMap.Delete(taskID)
-				break
-			}
+	// === 3️⃣ Ambil channel progress untuk taskID ini ===
+	// MoveRowsWithProgress mendaftarkan channel-nya di goroutine terpisah,
+	// jadi ada kemungkinan kecil browser connect sebelum itu sempat jalan —
+	// retry singkat (maks ~500ms) alih-alih langsung 404.
+	var progressChan chan float64
+	found := false
+	for i := 0; i < 50; i++ {
+		if val, ok := FolderRepositorys.ProgressChannels.Load(taskID); ok {
+			progressChan = val.(chan float64)
+			found = true
+			break
 		}
-
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
+	}
+	if !found {
+		http.Error(c.Writer, "Task not found", http.StatusNotFound)
+		return
 	}
 
-	// === 4️⃣ Pastikan koneksi ditutup dengan rapi ===
+	// === 4️⃣ Kirim setiap update PERSIS saat diterima — push, bukan polling,
+	// jadi progress muncul real-time apapun kecepatan penyalinannya ===
+	for progress := range progressChan {
+		fmt.Fprintf(c.Writer, "event: progress\ndata: %.2f\n\n", progress)
+		flusher.Flush()
+	}
+
+	// Channel ditutup oleh MoveRowsWithProgress setelah selesai
+	FolderRepositorys.ProgressChannels.Delete(taskID)
+	fmt.Fprintf(c.Writer, "event: done\ndata: Completed\n\n")
+	flusher.Flush()
+
+	// === 5️⃣ Pastikan koneksi ditutup dengan rapi ===
 	c.Writer.Write([]byte("event: close\ndata: Connection closed\n\n"))
 	flusher.Flush()
 }
