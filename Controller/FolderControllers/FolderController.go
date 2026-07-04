@@ -20,7 +20,7 @@ import (
 	messageStatus "web_backend/Model/MessageStatus"
 
 	// newFolder "web_backend/Model/NewFolder"
-	// tbFolder "web_backend/Model/TbFolder"
+	tbFolder "web_backend/Model/TbFolder"
 	"web_backend/Repository/FolderRepositorys"
 )
 
@@ -65,24 +65,27 @@ func UpdateAndInsert(c *gin.Context) {
 	}
 
 	db := connection.DB
-	// Process folders and insert into the database
+
+	// Satu query untuk semua nama yang sudah ada, bukan satu query
+	// exists-check per folder — ini yang bikin lambat begitu SRC_DIR
+	// punya banyak folder pending.
+	existingNames, err := FolderRepositorys.ExistingFolderNames(db)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
 	var messages []messageStatus.Message
+	var toInsert []tbFolder.Folder
+	var toInsertNames []string
+
 	for _, folder := range folders {
 		unixStylePath := strings.ReplaceAll(folder, "\\", "/")
 		finalFolderName := filepath.Base(unixStylePath)
 
-		// Cek apakah folder sudah ada di database
-		exists, err := FolderRepositorys.IsFolderExist(db, finalFolderName)
-		if err != nil {
-			messages = append(messages, messageStatus.Message{
-				FolderName: finalFolderName,
-				Status:     "error",
-				Error:      "check failed: " + err.Error(),
-			})
-			continue
-		}
-
-		if exists {
+		if existingNames[finalFolderName] {
 			messages = append(messages, messageStatus.Message{
 				FolderName: finalFolderName,
 				Status:     "skipped",
@@ -91,19 +94,37 @@ func UpdateAndInsert(c *gin.Context) {
 			continue
 		}
 
-		// Insert into database and collect status
-		err = FolderRepositorys.InsertFolder(db, finalFolderName, folder)
+		thumbnail, err := FolderRepositorys.BuildThumbnailURL(finalFolderName, folder)
 		if err != nil {
 			messages = append(messages, messageStatus.Message{
 				FolderName: finalFolderName,
 				Status:     "error",
 				Error:      err.Error(),
 			})
+			continue
+		}
+
+		toInsert = append(toInsert, tbFolder.Folder{Name: finalFolderName, Thumbnail: thumbnail})
+		toInsertNames = append(toInsertNames, finalFolderName)
+	}
+
+	// Satu batch insert untuk semua folder baru, bukan satu INSERT per folder.
+	if len(toInsert) > 0 {
+		if err := db.CreateInBatches(&toInsert, 200).Error; err != nil {
+			for _, name := range toInsertNames {
+				messages = append(messages, messageStatus.Message{
+					FolderName: name,
+					Status:     "error",
+					Error:      "batch insert failed: " + err.Error(),
+				})
+			}
 		} else {
-			messages = append(messages, messageStatus.Message{
-				FolderName: finalFolderName,
-				Status:     "success",
-			})
+			for _, name := range toInsertNames {
+				messages = append(messages, messageStatus.Message{
+					FolderName: name,
+					Status:     "success",
+				})
+			}
 		}
 	}
 

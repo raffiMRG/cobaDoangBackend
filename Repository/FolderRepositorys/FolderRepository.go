@@ -146,33 +146,29 @@ func ScanDestinationFolderNames() ([]string, error) {
 	return names, nil
 }
 
-func InsertFolder(db *gorm.DB, folderName, folderPath string) error {
-	// Membaca variabel dari .env
-	var apiBaseUrl string = os.Getenv("API_BASEURL")
+// BuildThumbnailURL reads folderPath's first file and builds the thumbnail
+// URL for it, without touching the DB — split out from the old InsertFolder
+// so UpdateAndInsert can batch the actual INSERT across all new folders
+// instead of one INSERT per folder.
+func BuildThumbnailURL(folderName, folderPath string) (string, error) {
+	apiBaseUrl := os.Getenv("API_BASEURL")
 
-	// check jika nama folder kosong
 	if folderName == "" {
-		return errors.New("folder name cannot be empty")
+		return "", errors.New("folder name cannot be empty")
 	}
 
-	// check apakah directory ada
-	// fullPath := filepath.Join(path, folderName)
-	fmt.Println("folderPath:", folderPath)
 	files, err := os.ReadDir(folderPath)
-	// fmt.Println("files:", files)
 	if err != nil {
-		return errors.New("folder does not exist")
+		return "", errors.New("folder does not exist")
+	}
+	if len(files) == 0 {
+		return "", errors.New("folder is empty")
 	}
 
 	thumbnailPath, _ := url.Parse(apiBaseUrl + "/sementara/")
 	thumbnailPath.Path = path.Join(thumbnailPath.Path, folderName, files[0].Name())
-	fmt.Println(thumbnailPath.String())
 
-	fmt.Println("thumbnail files:", thumbnailPath)
-
-	folder := tbFolder.Folder{Name: folderName, Thumbnail: thumbnailPath.String()}
-	return db.Create(&folder).Error
-	// return nil
+	return thumbnailPath.String(), nil
 }
 
 func GetAllData(table string, page, limit int) model.BaseResponseModel {
@@ -780,13 +776,20 @@ func FilteredData(table, table2 string) model.BaseResponseModel {
 	return result
 }
 
-func IsFolderExist(db *gorm.DB, folderName string) (bool, error) {
-	var count int64
-	err := db.Model(&tbFolder.Folder{}).Where("name = ?", folderName).Count(&count).Error
-	if err != nil {
-		return false, err
+// ExistingFolderNames returns every name currently in `folders` as a set, in
+// one query — used by UpdateAndInsert instead of one exists-check query per
+// scanned folder, which got slow once SRC_DIR had more than a handful of
+// pending folders.
+func ExistingFolderNames(db *gorm.DB) (map[string]bool, error) {
+	var names []string
+	if err := db.Model(&tbFolder.Folder{}).Pluck("name", &names).Error; err != nil {
+		return nil, err
 	}
-	return count > 0, nil
+	set := make(map[string]bool, len(names))
+	for _, n := range names {
+		set[n] = true
+	}
+	return set, nil
 }
 
 func FailedResponse(message error) model.BaseResponseModel {
