@@ -164,6 +164,7 @@ func main() {
 
 		protected.GET("/export", BackupController.Export)
 		protected.POST("/import", BackupController.Import)
+		protected.GET("/export/folders", BackupController.ExportDstFolders)
 	}
 
 	r.Run(":" + appPort)

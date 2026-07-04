@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -11,6 +12,7 @@ import (
 	model "web_backend/Model"
 	connection "web_backend/Model/Connection"
 	"web_backend/Repository/BackupRepositorys"
+	"web_backend/Repository/FolderRepositorys"
 )
 
 func Export(c *gin.Context) {
@@ -39,6 +41,24 @@ func Export(c *gin.Context) {
 	filename := fmt.Sprintf("manga-backup-%s-%s.sql", mode, time.Now().Format("20060102-150405"))
 	c.Header("Content-Disposition", "attachment; filename="+filename)
 	c.Data(http.StatusOK, "application/sql", []byte(sqlContent))
+}
+
+func ExportDstFolders(c *gin.Context) {
+	names, err := FolderRepositorys.ScanDestinationFolderNames()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.BaseResponseModel{
+			CodeResponse:  500,
+			HeaderMessage: "Error",
+			Message:       err.Error(),
+			Data:          nil,
+		})
+		return
+	}
+
+	content := strings.Join(names, "\n")
+	filename := fmt.Sprintf("dst-folders-%s.txt", time.Now().Format("20060102-150405"))
+	c.Header("Content-Disposition", "attachment; filename="+filename)
+	c.Data(http.StatusOK, "text/plain", []byte(content))
 }
 
 func Import(c *gin.Context) {

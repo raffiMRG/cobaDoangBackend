@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -120,6 +121,23 @@ func ScanFiles(root string) ([]string, error) {
 		return nil
 	})
 	return files, err
+}
+
+// ScanDestinationFolderNames scans DST_DIR one level deep (via ScanFolders)
+// and returns just the sorted folder names — used to compare what's actually
+// on disk against old DB backups, independent of the new_folders table.
+func ScanDestinationFolderNames() ([]string, error) {
+	destPath := os.Getenv("DST_DIR")
+	folders, err := ScanFolders(destPath)
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, len(folders))
+	for i, f := range folders {
+		names[i] = filepath.Base(strings.ReplaceAll(f, "\\", "/"))
+	}
+	sort.Strings(names)
+	return names, nil
 }
 
 func InsertFolder(db *gorm.DB, folderName, folderPath string) error {
