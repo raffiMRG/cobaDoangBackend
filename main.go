@@ -18,6 +18,7 @@ import (
 	BackupController "web_backend/Controller/BackupController"
 	Bookmarkcontroller "web_backend/Controller/BookmarkController"
 	folderController "web_backend/Controller/FolderControllers"
+	UploadController "web_backend/Controller/UploadController"
 	"web_backend/Middleware"
 	conn "web_backend/Model/Connection"
 	"web_backend/Repository/AuthRepositorys"
@@ -113,6 +114,11 @@ func main() {
 
 	r := gin.Default()
 
+	// Default is 32MiB — a manga chapter's worth of page images in one
+	// upload request can exceed that, so bump it to avoid Gin silently
+	// spilling the excess to temp files on disk for normal-sized uploads.
+	r.MaxMultipartMemory = 200 << 20
+
 	// Atur middleware CORS
 	r.Use(cors.New(cors.Config{
 		// AllowOrigins:     []string{"http://localhost:3000"}, // sesuaikan origin frontend kamu
@@ -165,6 +171,8 @@ func main() {
 		protected.GET("/export", BackupController.Export)
 		protected.POST("/import", BackupController.Import)
 		protected.GET("/export/folders", BackupController.ExportDstFolders)
+
+		protected.POST("/upload/folder", UploadController.UploadFolder)
 	}
 
 	r.Run(":" + appPort)
