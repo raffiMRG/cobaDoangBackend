@@ -7,7 +7,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -123,20 +122,27 @@ func ScanFiles(root string) ([]string, error) {
 	return files, err
 }
 
-// ScanDestinationFolderNames scans DST_DIR one level deep (via ScanFolders)
-// and returns just the sorted folder names — used to compare what's actually
-// on disk against old DB backups, independent of the new_folders table.
+// ScanDestinationFolderNames lists DST_DIR one level deep and returns just
+// the folder names — used to compare what's actually on disk against old DB
+// backups, independent of the new_folders table. Uses os.ReadDir directly
+// (not ScanFolders/filepath.Walk) since Walk calls os.Lstat per entry to
+// build a full os.FileInfo; for ~8000 entries on slower storage that extra
+// stat syscall per entry was enough to blow past the frontend's HTTP
+// timeout. ReadDir gets IsDir() from the raw directory read (d_type on most
+// Linux filesystems) with no extra syscall, and already returns entries
+// sorted by filename.
 func ScanDestinationFolderNames() ([]string, error) {
 	destPath := os.Getenv("DST_DIR")
-	folders, err := ScanFolders(destPath)
+	entries, err := os.ReadDir(destPath)
 	if err != nil {
 		return nil, err
 	}
-	names := make([]string, len(folders))
-	for i, f := range folders {
-		names[i] = filepath.Base(strings.ReplaceAll(f, "\\", "/"))
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() {
+			names = append(names, entry.Name())
+		}
 	}
-	sort.Strings(names)
 	return names, nil
 }
 

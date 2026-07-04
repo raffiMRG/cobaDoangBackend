@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -55,10 +54,9 @@ func ExportDstFolders(c *gin.Context) {
 		return
 	}
 
-	content := strings.Join(names, "\n")
-	filename := fmt.Sprintf("dst-folders-%s.txt", time.Now().Format("20060102-150405"))
+	filename := fmt.Sprintf("dst-folders-%s.json", time.Now().Format("20060102-150405"))
 	c.Header("Content-Disposition", "attachment; filename="+filename)
-	c.Data(http.StatusOK, "text/plain", []byte(content))
+	c.JSON(http.StatusOK, names)
 }
 
 func Import(c *gin.Context) {
