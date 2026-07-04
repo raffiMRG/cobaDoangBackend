@@ -1,0 +1,5 @@
+ALTER TABLE folders
+MODIFY COLUMN thumbnail VARCHAR(500) NULL;
+
+ALTER TABLE new_folders
+MODIFY COLUMN thumbnail VARCHAR(500) NULL;
