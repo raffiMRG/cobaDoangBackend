@@ -18,6 +18,7 @@ type NewFolderResponse struct {
 	CreateAt     time.Time `json:"create_at"`
 	Page         []string  `json:"page"`
 	IsBookmarked bool      `json:"is_bookmarked"`
+	IsTranslated bool      `json:"is_translated"`
 }
 
 type NewFolderQuery struct {
@@ -27,4 +28,5 @@ type NewFolderQuery struct {
 	IsCompleted  bool      `gorm:"column:is_completed" json:"is_completed"`
 	CreateAt     time.Time `gorm:"column:create_at" json:"create_at"`
 	IsBookmarked bool      `gorm:"column:is_bookmarked" json:"is_bookmarked"`
+	IsTranslated bool      `gorm:"column:is_translated" json:"is_translated"`
 }

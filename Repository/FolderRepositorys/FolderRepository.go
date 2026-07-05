@@ -69,7 +69,8 @@ func SearchFolders(keyword string, page int) ([]dto.NewFolderQuery, int64, error
 			nf.thumbnail,
 			nf.is_completed,
 			nf.create_at,
-			EXISTS (SELECT 1 FROM bookmarks b WHERE b.folder_id = nf.id) AS is_bookmarked
+			EXISTS (SELECT 1 FROM bookmarks b WHERE b.folder_id = nf.id) AS is_bookmarked,
+			EXISTS (SELECT 1 FROM translations t WHERE t.folder_id = nf.id) AS is_translated
 		`).
 		Where("nf.name LIKE ?", "%"+keyword+"%").
 		Order("nf.id DESC").
@@ -269,7 +270,8 @@ func GetAllDataNewfolders(page, limit int) model.BaseResponseModel {
 			nf.thumbnail,
 			nf.is_completed,
 			nf.create_at,
-			EXISTS (SELECT 1 FROM bookmarks b WHERE b.folder_id = nf.id) AS is_bookmarked
+			EXISTS (SELECT 1 FROM bookmarks b WHERE b.folder_id = nf.id) AS is_bookmarked,
+			EXISTS (SELECT 1 FROM translations t WHERE t.folder_id = nf.id) AS is_translated
 		`).
 		Order("nf.id DESC").
 		Limit(limit).
