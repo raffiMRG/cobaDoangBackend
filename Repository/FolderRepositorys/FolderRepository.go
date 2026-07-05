@@ -17,6 +17,7 @@ import (
 	dto "web_backend/DTO"
 	model "web_backend/Model"
 	connection "web_backend/Model/Connection"
+	"web_backend/Repository/UploadRepositorys"
 
 	"sync"
 
@@ -146,11 +147,9 @@ func ScanDestinationFolderNames() ([]string, error) {
 	return names, nil
 }
 
-// BuildThumbnailURL reads folderPath's first file and builds the thumbnail
-// URL for it, without touching the DB — split out from the old InsertFolder
-// so UpdateAndInsert can batch the actual INSERT across all new folders
-// instead of one INSERT per folder.
-func BuildThumbnailURL(folderName, folderPath string) (string, error) {
+// buildFileURL reads folderPath's first file and builds a URL for it under
+// the given static-serving path segment (e.g. "sementara" or "new").
+func buildFileURL(staticSegment, folderName, folderPath string) (string, error) {
 	apiBaseUrl := os.Getenv("API_BASEURL")
 
 	if folderName == "" {
@@ -165,10 +164,18 @@ func BuildThumbnailURL(folderName, folderPath string) (string, error) {
 		return "", errors.New("folder is empty")
 	}
 
-	thumbnailPath, _ := url.Parse(apiBaseUrl + "/sementara/")
-	thumbnailPath.Path = path.Join(thumbnailPath.Path, folderName, files[0].Name())
+	fileURL, _ := url.Parse(apiBaseUrl + "/" + staticSegment + "/")
+	fileURL.Path = path.Join(fileURL.Path, folderName, files[0].Name())
 
-	return thumbnailPath.String(), nil
+	return fileURL.String(), nil
+}
+
+// BuildThumbnailURL reads folderPath's first file and builds the thumbnail
+// URL for it, without touching the DB — split out from the old InsertFolder
+// so UpdateAndInsert can batch the actual INSERT across all new folders
+// instead of one INSERT per folder.
+func BuildThumbnailURL(folderName, folderPath string) (string, error) {
+	return buildFileURL("sementara", folderName, folderPath)
 }
 
 func GetAllData(table string, page, limit int) model.BaseResponseModel {
@@ -497,6 +504,79 @@ func GetNewfolderRowFromId(id string) (*NewFolder.NewFolder, error) {
 	fmt.Println("id query " + id)
 
 	return &data, nil
+}
+
+// RenameNewFolder updates a new_folders row's name, and optionally the
+// matching directory in DST_DIR to keep disk and DB in sync. When
+// applyToDisk is false, only the DB row changes — useful for correcting the
+// catalog to match a folder that was already renamed by hand on disk (or
+// just fixing a display typo without touching real files).
+func RenameNewFolder(id, newName string, applyToDisk bool) model.BaseResponseModel {
+	db := connection.DB
+
+	row, err := GetNewfolderRowFromId(id)
+	if err != nil {
+		return model.BaseResponseModel{CodeResponse: 404, HeaderMessage: "Error", Message: err.Error(), Data: nil}
+	}
+
+	safeName, err := UploadRepositorys.SanitizeName(newName)
+	if err != nil {
+		return model.BaseResponseModel{CodeResponse: 400, HeaderMessage: "Bad Request", Message: err.Error(), Data: nil}
+	}
+
+	updates := map[string]interface{}{"name": safeName}
+
+	if applyToDisk {
+		dstPath := os.Getenv("DST_DIR")
+		oldPath := dstPath + "/" + row.Name
+		newPath := dstPath + "/" + safeName
+
+		if _, statErr := os.Stat(oldPath); statErr != nil {
+			return model.BaseResponseModel{CodeResponse: 400, HeaderMessage: "Bad Request", Message: "original folder not found on disk: " + statErr.Error(), Data: nil}
+		}
+		if err := os.Rename(oldPath, newPath); err != nil {
+			return model.BaseResponseModel{CodeResponse: 500, HeaderMessage: "Error", Message: err.Error(), Data: nil}
+		}
+
+		// The stored thumbnail URL was baked in at move-time and still
+		// points at the old folder name — recompute it so listings don't
+		// end up with a broken image. Non-fatal if it fails (e.g. the
+		// folder happens to be empty): the rename itself already succeeded.
+		if newThumbnail, thumbErr := buildFileURL("new", safeName, newPath); thumbErr == nil {
+			updates["thumbnail"] = newThumbnail
+		}
+	}
+
+	if err := db.Model(&NewFolder.NewFolder{}).Where("id = ?", row.ID).Updates(updates).Error; err != nil {
+		return model.BaseResponseModel{CodeResponse: 500, HeaderMessage: "Error", Message: err.Error(), Data: nil}
+	}
+
+	return model.BaseResponseModel{CodeResponse: 200, HeaderMessage: "Success", Message: "renamed successfully", Data: updates}
+}
+
+// DeleteNewFolder removes a new_folders row, and optionally its matching
+// directory in DST_DIR. Bookmarks on this folder are cleaned up
+// automatically via the bookmarks.folder_id ON DELETE CASCADE FK.
+func DeleteNewFolder(id string, applyToDisk bool) model.BaseResponseModel {
+	db := connection.DB
+
+	row, err := GetNewfolderRowFromId(id)
+	if err != nil {
+		return model.BaseResponseModel{CodeResponse: 404, HeaderMessage: "Error", Message: err.Error(), Data: nil}
+	}
+
+	if applyToDisk {
+		dstPath := os.Getenv("DST_DIR")
+		if err := os.RemoveAll(dstPath + "/" + row.Name); err != nil {
+			return model.BaseResponseModel{CodeResponse: 500, HeaderMessage: "Error", Message: err.Error(), Data: nil}
+		}
+	}
+
+	if err := db.Delete(&NewFolder.NewFolder{}, row.ID).Error; err != nil {
+		return model.BaseResponseModel{CodeResponse: 500, HeaderMessage: "Error", Message: err.Error(), Data: nil}
+	}
+
+	return model.BaseResponseModel{CodeResponse: 200, HeaderMessage: "Success", Message: "deleted successfully", Data: nil}
 }
 
 // =======================================================

@@ -14,11 +14,13 @@ import (
 // errors.Is(err, ErrInvalidName) to pick the right status code.
 var ErrInvalidName = errors.New("invalid name")
 
-// sanitizeName rejects path separators, ".." and empty names — folderName
+// SanitizeName rejects path separators, ".." and empty names — folderName
 // and each uploaded filename both come from a remote client over the
 // network, so filepath.Join-ing them into SRC_DIR without this check would
-// let a crafted name escape SRC_DIR entirely.
-func sanitizeName(name string) (string, error) {
+// let a crafted name escape SRC_DIR entirely. Exported for reuse anywhere
+// else a user-supplied name gets joined into a filesystem path (e.g.
+// renaming a new_folders entry's on-disk directory).
+func SanitizeName(name string) (string, error) {
 	if name == "" {
 		return "", fmt.Errorf("%w: name cannot be empty", ErrInvalidName)
 	}
@@ -35,7 +37,7 @@ func sanitizeName(name string) (string, error) {
 // overwritten — a re-uploaded/updated zip should only add new pages, not
 // clobber existing ones that may have been manually edited/renamed since.
 func SaveFolderFiles(srcDir, folderName string, files []*multipart.FileHeader) (written, skipped int, err error) {
-	safeFolderName, err := sanitizeName(folderName)
+	safeFolderName, err := SanitizeName(folderName)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -46,7 +48,7 @@ func SaveFolderFiles(srcDir, folderName string, files []*multipart.FileHeader) (
 	}
 
 	for _, fh := range files {
-		safeFileName, err := sanitizeName(fh.Filename)
+		safeFileName, err := SanitizeName(fh.Filename)
 		if err != nil {
 			return written, skipped, err
 		}

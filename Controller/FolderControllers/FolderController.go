@@ -179,6 +179,40 @@ func GetDataById(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
+func RenameNewFolder(c *gin.Context) {
+	var request dto.RenameNewFolderRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, model.BaseResponseModel{
+			CodeResponse:  400,
+			HeaderMessage: "Bad Request",
+			Message:       err.Error(),
+			Data:          nil,
+		})
+		return
+	}
+
+	strId := c.Param("id")
+	response := FolderRepositorys.RenameNewFolder(strId, request.NewName, request.ApplyToDisk)
+	c.JSON(response.CodeResponse, response)
+}
+
+func DeleteNewFolder(c *gin.Context) {
+	var request dto.DeleteNewFolderRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, model.BaseResponseModel{
+			CodeResponse:  400,
+			HeaderMessage: "Bad Request",
+			Message:       err.Error(),
+			Data:          nil,
+		})
+		return
+	}
+
+	strId := c.Param("id")
+	response := FolderRepositorys.DeleteNewFolder(strId, request.ApplyToDisk)
+	c.JSON(response.CodeResponse, response)
+}
+
 func MoveRow(c *gin.Context) {
 	var request dto.InputDataReq
 	var response model.BaseResponseModel

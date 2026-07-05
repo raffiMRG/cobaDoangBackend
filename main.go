@@ -150,6 +150,8 @@ func main() {
 		protected.GET("/update", folderController.UpdateAndInsert)
 		protected.GET("/folders", folderController.DisplayAllDataFolder)
 		protected.GET("/id/:id", folderController.GetDataById)
+		protected.PATCH("/id/:id", folderController.RenameNewFolder)
+		protected.DELETE("/id/:id", folderController.DeleteNewFolder)
 
 		// protected.POST("/folders", folderController.MoveRow)
 		protected.POST("/folders", folderController.MoveRowAndTrack)
