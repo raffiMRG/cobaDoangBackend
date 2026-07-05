@@ -18,6 +18,7 @@ import (
 	BackupController "web_backend/Controller/BackupController"
 	Bookmarkcontroller "web_backend/Controller/BookmarkController"
 	folderController "web_backend/Controller/FolderControllers"
+	TranslateController "web_backend/Controller/TranslateController"
 	UploadController "web_backend/Controller/UploadController"
 	"web_backend/Middleware"
 	conn "web_backend/Model/Connection"
@@ -175,6 +176,11 @@ func main() {
 		protected.GET("/export/folders", BackupController.ExportDstFolders)
 
 		protected.POST("/upload/folder", UploadController.UploadFolder)
+
+		protected.POST("/translate/:id/request", TranslateController.RequestTranslation)
+		protected.GET("/translate/pending", TranslateController.ListPending)
+		protected.PATCH("/translate/:id/status", TranslateController.UpdateStatus)
+		protected.POST("/translate/:id/complete", TranslateController.CompleteTranslation)
 	}
 
 	r.Run(":" + appPort)

@@ -11,14 +11,16 @@ type InputDataRes struct {
 }
 
 type NewFolderResponse struct {
-	ID           int       `json:"id"`
-	Name         string    `json:"name"`
-	Thumbnail    string    `json:"thumbnail"`
-	IsCompleted  bool      `json:"is_completed"`
-	CreateAt     time.Time `json:"create_at"`
-	Page         []string  `json:"page"`
-	IsBookmarked bool      `json:"is_bookmarked"`
-	IsTranslated bool      `json:"is_translated"`
+	ID                int       `json:"id"`
+	Name              string    `json:"name"`
+	Thumbnail         string    `json:"thumbnail"`
+	IsCompleted       bool      `json:"is_completed"`
+	CreateAt          time.Time `json:"create_at"`
+	Page              []string  `json:"page"`
+	IsBookmarked      bool      `json:"is_bookmarked"`
+	IsTranslated      bool      `json:"is_translated"`
+	TranslationStatus string    `json:"translation_status"`
+	TranslationError  string    `json:"translation_error,omitempty"`
 }
 
 type NewFolderQuery struct {

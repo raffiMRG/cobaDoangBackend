@@ -70,7 +70,7 @@ func SearchFolders(keyword string, page int) ([]dto.NewFolderQuery, int64, error
 			nf.is_completed,
 			nf.create_at,
 			EXISTS (SELECT 1 FROM bookmarks b WHERE b.folder_id = nf.id) AS is_bookmarked,
-			EXISTS (SELECT 1 FROM translations t WHERE t.folder_id = nf.id) AS is_translated
+			EXISTS (SELECT 1 FROM translations t WHERE t.folder_id = nf.id AND t.status = 'completed') AS is_translated
 		`).
 		Where("nf.name LIKE ?", "%"+keyword+"%").
 		Order("nf.id DESC").
@@ -179,6 +179,13 @@ func BuildThumbnailURL(folderName, folderPath string) (string, error) {
 	return buildFileURL("sementara", folderName, folderPath)
 }
 
+// BuildNewFolderThumbnailURL is BuildThumbnailURL's DST_DIR counterpart —
+// used wherever a thumbnail is (re)computed for a folder that already lives
+// under DST_DIR (e.g. a freshly-uploaded translated manga).
+func BuildNewFolderThumbnailURL(folderName, folderPath string) (string, error) {
+	return buildFileURL("new", folderName, folderPath)
+}
+
 func GetAllData(table string, page, limit int) model.BaseResponseModel {
 	var result model.BaseResponseModel
 	var ListData []tbFolder.Folder
@@ -271,7 +278,7 @@ func GetAllDataNewfolders(page, limit int) model.BaseResponseModel {
 			nf.is_completed,
 			nf.create_at,
 			EXISTS (SELECT 1 FROM bookmarks b WHERE b.folder_id = nf.id) AS is_bookmarked,
-			EXISTS (SELECT 1 FROM translations t WHERE t.folder_id = nf.id) AS is_translated
+			EXISTS (SELECT 1 FROM translations t WHERE t.folder_id = nf.id AND t.status = 'completed') AS is_translated
 		`).
 		Order("nf.id DESC").
 		Limit(limit).
@@ -419,14 +426,18 @@ func GetNewfolderDataFromId(id string) model.BaseResponseModel {
 		return result
 	}
 
+	translationStatus, translationError := getTranslationStatus(listData.ID)
+
 	// Masukkan ke struct response
 	response := dto.NewFolderResponse{
-		ID:          listData.ID,
-		Name:        listData.Name,
-		Thumbnail:   listData.Thumbnail,
-		IsCompleted: listData.IsCompleted,
-		CreateAt:    listData.CreateAt,
-		Page:        pages,
+		ID:                listData.ID,
+		Name:              listData.Name,
+		Thumbnail:         listData.Thumbnail,
+		IsCompleted:       listData.IsCompleted,
+		CreateAt:          listData.CreateAt,
+		Page:              pages,
+		TranslationStatus: translationStatus,
+		TranslationError:  translationError,
 	}
 
 	if tempResult.Error != nil {
@@ -506,6 +517,25 @@ func GetNewfolderRowFromId(id string) (*NewFolder.NewFolder, error) {
 	fmt.Println("id query " + id)
 
 	return &data, nil
+}
+
+// getTranslationStatus looks up folderId's own translations row, returning
+// ("none", "") if no request has ever been made for it.
+func getTranslationStatus(folderId int) (status string, errorMessage string) {
+	var row struct {
+		Status       string
+		ErrorMessage string
+	}
+
+	connection.DB.Table("translations").
+		Select("status, error_message").
+		Where("folder_id = ?", folderId).
+		Scan(&row)
+
+	if row.Status == "" {
+		return "none", ""
+	}
+	return row.Status, row.ErrorMessage
 }
 
 // RenameNewFolder updates a new_folders row's name, and optionally the
