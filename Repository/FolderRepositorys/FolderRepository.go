@@ -89,25 +89,24 @@ func SearchFolders(keyword string, page int) ([]dto.NewFolderQuery, int64, error
 	return foldersQuery, int64(len(foldersQuery)), nil
 }
 
+// ScanFolders lists root one level deep and returns the full path of each
+// subdirectory. Uses os.ReadDir (not filepath.Walk) for the same reason as
+// ScanDestinationFolderNames below: Walk calls os.Lstat per entry to build a
+// full os.FileInfo, which on slower storage adds one extra stat syscall per
+// folder for no benefit here — ReadDir gets IsDir() from the raw directory
+// read (d_type on most Linux filesystems) with no extra syscall.
 func ScanFolders(root string) ([]string, error) {
-	var folders []string
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return nil, err
+	}
+	folders := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() {
+			folders = append(folders, filepath.Join(root, entry.Name()))
 		}
-		if info.IsDir() && path != root {
-			relPath, err := filepath.Rel(root, path)
-			if err != nil {
-				return err
-			}
-			if filepath.Dir(relPath) == "." {
-				folders = append(folders, path)
-			}
-			return filepath.SkipDir
-		}
-		return nil
-	})
-	return folders, err
+	}
+	return folders, nil
 }
 
 func ScanFiles(root string) ([]string, error) {
