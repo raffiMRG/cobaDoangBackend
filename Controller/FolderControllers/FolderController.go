@@ -80,10 +80,12 @@ func UpdateAndInsert(c *gin.Context) {
 	var messages []messageStatus.Message
 	var toInsert []tbFolder.Folder
 	var toInsertNames []string
+	scannedNames := make(map[string]bool, len(folders))
 
 	for _, folder := range folders {
 		unixStylePath := strings.ReplaceAll(folder, "\\", "/")
 		finalFolderName := filepath.Base(unixStylePath)
+		scannedNames[finalFolderName] = true
 
 		if existingNames[finalFolderName] {
 			messages = append(messages, messageStatus.Message{
@@ -106,6 +108,42 @@ func UpdateAndInsert(c *gin.Context) {
 
 		toInsert = append(toInsert, tbFolder.Folder{Name: finalFolderName, Thumbnail: thumbnail})
 		toInsertNames = append(toInsertNames, finalFolderName)
+	}
+
+	// Row folders yang namanya sudah tercatat di DB tapi tidak lagi muncul
+	// di hasil scan SRC_DIR sekarang — foldernya sudah dihapus/dipindah
+	// manual di luar aplikasi, dan tanpa ini thumbnail-nya nyangkut 404
+	// selamanya (lihat zunks/why 404.md, kasus pertama). Guard di
+	// len(scannedNames) == 0 supaya SRC_DIR yang gagal ke-mount / kosong
+	// sesaat tidak disalahartikan sebagai "semua folder hilang" dan
+	// nge-wipe seluruh tabel.
+	if len(scannedNames) > 0 {
+		var orphanNames []string
+		for name := range existingNames {
+			if !scannedNames[name] {
+				orphanNames = append(orphanNames, name)
+			}
+		}
+
+		if len(orphanNames) > 0 {
+			if err := db.Where("name IN ?", orphanNames).Delete(&tbFolder.Folder{}).Error; err != nil {
+				for _, name := range orphanNames {
+					messages = append(messages, messageStatus.Message{
+						FolderName: name,
+						Status:     "error",
+						Error:      "gagal hapus row yatim: " + err.Error(),
+					})
+				}
+			} else {
+				for _, name := range orphanNames {
+					messages = append(messages, messageStatus.Message{
+						FolderName: name,
+						Status:     "deleted",
+						Error:      "folder tidak ditemukan lagi di SRC_DIR",
+					})
+				}
+			}
+		}
 	}
 
 	// Satu batch insert untuk semua folder baru, bukan satu INSERT per folder.
