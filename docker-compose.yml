@@ -22,6 +22,13 @@ services:
       SRC_DIR: /sementara
       DST_DIR: /new
       JWT_SECRET: ${JWT_SECRET}
+      # Go's mime/multipart caps a parsed form at 1000 parts by default
+      # (regardless of MaxMultipartMemory byte size) — /upload/folder gets
+      # one multipart part per page image, so any zip with >1000 pages
+      # (e.g. a bundled complete-series zip) hits "multipart: message too
+      # large" even though it's well under the byte-size limit. Raised with
+      # headroom above real-world volume sizes.
+      GODEBUG: multipartmaxparts=5000
     networks:
       - manga-network
     volumes:
