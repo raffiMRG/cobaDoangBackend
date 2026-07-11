@@ -178,6 +178,7 @@ func main() {
 		protected.POST("/upload/folder", UploadController.UploadFolder)
 
 		protected.POST("/translate/:id/request", TranslateController.RequestTranslation)
+		protected.DELETE("/translate/:id", TranslateController.CancelTranslation)
 		protected.GET("/translate/pending", TranslateController.ListPending)
 		protected.PATCH("/translate/:id/status", TranslateController.UpdateStatus)
 		protected.POST("/translate/:id/complete", TranslateController.CompleteTranslation)

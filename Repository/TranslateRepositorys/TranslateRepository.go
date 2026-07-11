@@ -25,11 +25,13 @@ var validStatuses = map[string]bool{
 	"failed":     true,
 }
 
-// RequestTranslation enqueues folderId for translation. Idempotent: a
-// second request while already pending/completed just returns the current
-// status unchanged; a request while failed/processing resets it to pending
-// (the latter doubles as manual recovery if a worker ever crashes mid-job,
-// since there's no automatic timeout/retry yet).
+// RequestTranslation enqueues folderId for translation. A second request
+// while already pending is a no-op (returns the current status unchanged);
+// a request while failed/processing/completed resets it to pending — the
+// failed/processing case doubles as manual recovery if a worker ever
+// crashes mid-job (no automatic timeout/retry yet), and completed is
+// allowed to be re-queued on purpose so a manga can be re-translated
+// (e.g. after a bad run) without any separate "retranslate" action.
 func RequestTranslation(folderIdStr string) model.BaseResponseModel {
 	db := connection.DB
 
@@ -57,15 +59,46 @@ func RequestTranslation(folderIdStr string) model.BaseResponseModel {
 	case err != nil:
 		return model.BaseResponseModel{CodeResponse: 500, HeaderMessage: "Error", Message: err.Error(), Data: nil}
 
-	case existing.Status == "pending" || existing.Status == "completed":
+	case existing.Status == "pending":
 		return model.BaseResponseModel{CodeResponse: 200, HeaderMessage: "Success", Message: "already " + existing.Status, Data: map[string]string{"status": existing.Status}}
 
-	default: // failed, processing
+	default: // completed, failed, processing
 		if err := db.Model(&existing).Updates(map[string]interface{}{"status": "pending", "error_message": ""}).Error; err != nil {
 			return model.BaseResponseModel{CodeResponse: 500, HeaderMessage: "Error", Message: err.Error(), Data: nil}
 		}
 		return model.BaseResponseModel{CodeResponse: 200, HeaderMessage: "Success", Message: "translation requested", Data: map[string]string{"status": "pending"}}
 	}
+}
+
+// CancelTranslation removes a translation request from the queue (used by
+// the "keluarkan dari antrian" button on the /translate batch page, which
+// only ever lists pending items). Refuses to touch a row the worker is
+// actively processing, since the daemon would otherwise keep calling
+// /translate/:id/status or /translate/:id/complete against a row that no
+// longer exists partway through a job.
+func CancelTranslation(folderIdStr string) model.BaseResponseModel {
+	folderId, err := strconv.Atoi(folderIdStr)
+	if err != nil {
+		return model.BaseResponseModel{CodeResponse: 400, HeaderMessage: "Bad Request", Message: "invalid id", Data: nil}
+	}
+
+	var existing Translation.Translation
+	if err := connection.DB.Where("folder_id = ?", folderId).First(&existing).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return model.BaseResponseModel{CodeResponse: 404, HeaderMessage: "Error", Message: "no translation request found", Data: nil}
+		}
+		return model.BaseResponseModel{CodeResponse: 500, HeaderMessage: "Error", Message: err.Error(), Data: nil}
+	}
+
+	if existing.Status == "processing" {
+		return model.BaseResponseModel{CodeResponse: 409, HeaderMessage: "Error", Message: "cannot cancel: translation is currently processing", Data: nil}
+	}
+
+	if err := connection.DB.Delete(&existing).Error; err != nil {
+		return model.BaseResponseModel{CodeResponse: 500, HeaderMessage: "Error", Message: err.Error(), Data: nil}
+	}
+
+	return model.BaseResponseModel{CodeResponse: 200, HeaderMessage: "Success", Message: "translation request removed", Data: nil}
 }
 
 // ListPendingTranslations backs the /translate batch page — every manga

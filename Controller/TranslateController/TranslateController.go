@@ -16,6 +16,12 @@ func RequestTranslation(c *gin.Context) {
 	c.JSON(response.CodeResponse, response)
 }
 
+func CancelTranslation(c *gin.Context) {
+	id := c.Param("id")
+	response := TranslateRepositorys.CancelTranslation(id)
+	c.JSON(response.CodeResponse, response)
+}
+
 func ListPending(c *gin.Context) {
 	items, err := TranslateRepositorys.ListPendingTranslations()
 	if err != nil {
