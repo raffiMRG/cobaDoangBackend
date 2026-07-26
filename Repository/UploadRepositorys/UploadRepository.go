@@ -70,11 +70,24 @@ func SaveFolderFiles(srcDir, folderName string, files []*multipart.FileHeader) (
 			return written, skipped, err
 		}
 
-		_, copyErr := io.Copy(dst, src)
+		copiedBytes, copyErr := io.Copy(dst, src)
 		src.Close()
 		dst.Close()
 		if copyErr != nil {
 			return written, skipped, copyErr
+		}
+
+		// Guards against a client that reports a non-empty part but the body
+		// read as 0 bytes — io.Copy treats that as a clean, error-free
+		// transfer (0 bytes isn't an I/O error), so this is the only place
+		// left to catch it. Concretely: the translate worker retrying an
+		// upload after a 401 with an already-EOF'd file handle used to sail
+		// through exactly this path and leave a "successful" completed
+		// translation whose every page was a 0-byte file (see
+		// zunks/feat/patch-error-translate-1.md).
+		if fh.Size > 0 && copiedBytes == 0 {
+			os.Remove(destPath)
+			return written, skipped, fmt.Errorf("uploaded file %q is empty (expected %d bytes) — refusing to save a truncated file", fh.Filename, fh.Size)
 		}
 
 		written++
