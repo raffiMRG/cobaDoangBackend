@@ -33,34 +33,24 @@ import (
 // personal single-user app and that scenario isn't expected in practice.
 var ProgressChannels sync.Map
 
-// func SearchFolders(keyword string, page int) ([]NewFolder.NewFolder, int64, error) {
 func SearchFolders(keyword string, page int) ([]dto.NewFolderQuery, int64, error) {
-	// var folders []NewFolder.NewFolder
-	// var folders []dto.NewFolderResponse
 	var foldersQuery []dto.NewFolderQuery
-	// var total int64
+	var total int64
 
 	limit := 20
 	offset := (page - 1) * limit
 
-	// ==== Query lama start ====
-	// query := connection.DB.Model(&NewFolder.NewFolder{})
-	// if keyword != "" {
-	// 	query = query.Where("name LIKE ?", "%"+keyword+"%")
-	// }
+	// Hitung total data yang match keyword sebelum paginasi, terpisah dari
+	// query Select di bawah — kalau tidak, total hanya akan mencerminkan
+	// jumlah baris di halaman saat ini (maks `limit`), bikin frontend
+	// selalu menghitung 1 halaman pagination berapa pun jumlah hasil
+	// sebenarnya.
+	if err := connection.DB.Model(&NewFolder.NewFolder{}).
+		Where("name LIKE ?", "%"+keyword+"%").
+		Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
 
-	// // Hitung total data sebelum paginasi
-	// if err := query.Count(&total).Error; err != nil {
-	// 	return nil, 0, err
-	// }
-
-	// // Ambil data dengan pagination
-	// if err := query.Limit(limit).Offset(offset).Find(&folders).Error; err != nil {
-	// 	return nil, 0, err
-	// }
-	// ==== Query lama end ====
-
-	// ==== Query data baru start ====
 	// Ambil data dengan limit & offset
 	err := connection.DB.Table("new_folders nf").
 		Select(`
@@ -77,16 +67,12 @@ func SearchFolders(keyword string, page int) ([]dto.NewFolderQuery, int64, error
 		Limit(limit).
 		Offset(offset).
 		Scan(&foldersQuery).Error
-	// Find(&folders).Error
-	// ==== Query data baru end ====
 
 	if err != nil {
 		return nil, 0, err
 	}
 
-	// return folders, total, nil
-	// fmt.Println("total data:", int64(len(folders)))
-	return foldersQuery, int64(len(foldersQuery)), nil
+	return foldersQuery, total, nil
 }
 
 // ScanFolders lists root one level deep and returns the full path of each
