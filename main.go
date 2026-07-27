@@ -138,7 +138,7 @@ func main() {
 	r.Static("/sementara", srcPath)
 
 	r.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+		c.JSON(http.StatusOK, gin.H{"status": "ok ready"})
 	})
 
 	r.POST("/login", AuthController.Login)
