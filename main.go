@@ -158,6 +158,7 @@ func main() {
 		// protected.POST("/folders", folderController.MoveRow)
 		protected.POST("/folders", folderController.MoveRowAndTrack)
 		protected.GET("/folders/progress/:taskID", folderController.FolderProgress)
+		protected.POST("/folders/delete", folderController.DeleteRowsAndTrack)
 
 		protected.GET("/newFolders", folderController.DisplayDataNewfolder)
 

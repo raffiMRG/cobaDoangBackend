@@ -303,6 +303,47 @@ func MoveRowAndTrack(c *gin.Context) {
 	})
 }
 
+// DeleteRowsAndTrack starts an async, progress-tracked bulk delete of
+// selected "folders" rows (and their SRC_DIR directory) — the /status
+// page's Delete counterpart to MoveRowAndTrack's Move. Reuses the same
+// GET /folders/progress/:taskID SSE endpoint; the frontend can point the
+// existing listenProgress() JS at this taskID without changes.
+func DeleteRowsAndTrack(c *gin.Context) {
+	var request dto.InputDataReq
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, model.BaseResponseModel{
+			CodeResponse:  400,
+			HeaderMessage: "Bad Request",
+			Message:       err.Error(),
+			Data:          nil,
+		})
+		return
+	}
+
+	if len(request.IDS) == 0 {
+		c.JSON(http.StatusBadRequest, model.BaseResponseModel{
+			CodeResponse:  400,
+			HeaderMessage: "Bad Request",
+			Message:       "no ids provided",
+			Data:          nil,
+		})
+		return
+	}
+
+	taskID := uuid.New().String()
+
+	go FolderRepositorys.DeleteRowsWithProgress(taskID, request.IDS, "folders")
+
+	c.JSON(http.StatusOK, model.BaseResponseModel{
+		CodeResponse:  200,
+		HeaderMessage: "Accepted",
+		Message:       "Proses penghapusan dimulai",
+		Data: map[string]string{
+			"task_id": taskID,
+		},
+	})
+}
+
 func FolderProgress(c *gin.Context) {
 	taskID := c.Param("taskID")
 

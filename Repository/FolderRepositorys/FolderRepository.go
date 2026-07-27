@@ -728,6 +728,64 @@ func MoveRows(ids []int, sourceTable, targetTable string) model.BaseResponseMode
 	}
 }
 
+// DeleteRowsWithProgress permanently removes selected rows from
+// sourceTable ("folders") and their matching directory in SRC_DIR.
+// Mirrors MoveRowsWithProgress's task/SSE plumbing (same
+// ProgressChannels map, same taskID contract) so the frontend can reuse
+// the exact same polling code — but skips the copy-to-DST_DIR/insert
+// half entirely, since there's no destination row for a deleted folder.
+//
+// Unlike move, progress here is reported per FOLDER completed, not per
+// file: os.RemoveAll doesn't offer a per-file callback the way copyPaste
+// does, and deleting is fast enough (no disk-to-disk copy) that
+// per-folder granularity is enough for a progress bar to look live.
+func DeleteRowsWithProgress(taskID string, ids []int, sourceTable string) {
+	srcPath := os.Getenv("SRC_DIR")
+	db := connection.DB
+	total := len(ids)
+
+	progressChan := make(chan float64, total+1)
+	ProgressChannels.Store(taskID, progressChan)
+	defer close(progressChan)
+
+	if total == 0 {
+		progressChan <- 100.0
+		return
+	}
+
+	done := 0
+	_ = db.Transaction(func(tx *gorm.DB) error {
+		for _, id := range ids {
+			if id < 0 {
+				continue
+			}
+
+			strId := strconv.Itoa(id)
+			row, err := GetRowFromId(sourceTable, strId)
+			if err != nil || row == nil {
+				// Row sudah tidak ada (mis. sudah di-delete/move di request
+				// lain) — lewati, bukan fatal, sama seperti perilaku
+				// MoveRowsWithProgress untuk kasus ini.
+				done++
+				progressChan <- (float64(done) / float64(total)) * 100
+				continue
+			}
+
+			source := srcPath + "/" + row.Name + "/"
+
+			// os.RemoveAll tidak error kalau path sudah tidak ada — folder
+			// yang sudah kehapus manual di luar aplikasi tetap boleh
+			// lanjut hapus row DB-nya, bukan nge-block seluruh batch.
+			_ = os.RemoveAll(source)
+			_ = tx.Table(sourceTable).Where("id = ?", row.ID).Delete(nil).Error
+
+			done++
+			progressChan <- (float64(done) / float64(total)) * 100
+		}
+		return nil
+	})
+}
+
 func MoveRowsWithProgress(taskID string, ids []int, sourceTable, targetTable string) {
 	var srcPath = os.Getenv("SRC_DIR")
 	var destPath = os.Getenv("DST_DIR")
