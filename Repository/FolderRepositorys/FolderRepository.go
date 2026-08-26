@@ -95,18 +95,24 @@ func ScanFolders(root string) ([]string, error) {
 	return folders, nil
 }
 
+// ScanFiles lists the page image files directly inside a single manga
+// folder (one level, no subdirectories — see ScanDestinationFolderNames'
+// comment below for why os.ReadDir is used here instead of filepath.Walk:
+// the same Lstat-per-entry slowness that could blow past the frontend's
+// HTTP timeout for a large DST_DIR listing applies here too, and this is
+// on the hot path of GET /id/:id).
 func ScanFiles(root string) ([]string, error) {
-	var files []string
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return nil, err
+	}
+	files := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			files = append(files, entry.Name())
 		}
-		if !info.IsDir() {
-			files = append(files, filepath.Base(path))
-		}
-		return nil
-	})
-	return files, err
+	}
+	return files, nil
 }
 
 // ScanDestinationFolderNames lists DST_DIR one level deep and returns just
@@ -943,6 +949,30 @@ func ExistingFolderNames(db *gorm.DB) (map[string]bool, error) {
 	set := make(map[string]bool, len(names))
 	for _, n := range names {
 		set[n] = true
+	}
+	return set, nil
+}
+
+// ExistingNewFolderNames returns every approved new_folders name mapped to
+// its ID, in one query — mirrors ExistingFolderNames' bulk-query rationale
+// but for new_folders, used by UpdateAndInsert to route a scanned name that
+// already has an approved counterpart into the duplicate-review queue
+// instead of silently inserting it as if brand new (see
+// zunks/feat/patch_handle_duplication-2.md). Ordered oldest-first so that
+// when a name happens to have more than one new_folders row (an existing
+// self-duplicate from a gap the same doc describes), the map ends up
+// pointing at the most recently approved one.
+func ExistingNewFolderNames(db *gorm.DB) (map[string]uint, error) {
+	var rows []struct {
+		ID   uint
+		Name string
+	}
+	if err := db.Model(&NewFolder.NewFolder{}).Select("id, name").Order("create_at ASC").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	set := make(map[string]uint, len(rows))
+	for _, r := range rows {
+		set[r.Name] = r.ID
 	}
 	return set, nil
 }

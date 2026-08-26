@@ -21,6 +21,7 @@ import (
 
 	// newFolder "web_backend/Model/NewFolder"
 	tbFolder "web_backend/Model/TbFolder"
+	"web_backend/Repository/DuplicateRepositorys"
 	"web_backend/Repository/FolderRepositorys"
 )
 
@@ -77,6 +78,19 @@ func UpdateAndInsert(c *gin.Context) {
 		return
 	}
 
+	// Sama seperti existingNames di atas, tapi untuk new_folders (folder
+	// yang sudah di-approve) — dipakai supaya nama yang muncul lagi di
+	// SRC_DIR tapi sudah pernah selesai tidak langsung di-insert ulang
+	// seolah baru, melainkan diarahkan ke antrian review manual. Lihat
+	// zunks/feat/patch_handle_duplication-2.md.
+	existingNewFolders, err := FolderRepositorys.ExistingNewFolderNames(db)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
 	var messages []messageStatus.Message
 	var toInsert []tbFolder.Folder
 	var toInsertNames []string
@@ -93,6 +107,23 @@ func UpdateAndInsert(c *gin.Context) {
 				Status:     "skipped",
 				Error:      "folder already exists",
 			})
+			continue
+		}
+
+		if existingNewFolderID, ok := existingNewFolders[finalFolderName]; ok {
+			if err := DuplicateRepositorys.QueueCandidate(finalFolderName, folder, existingNewFolderID); err != nil {
+				messages = append(messages, messageStatus.Message{
+					FolderName: finalFolderName,
+					Status:     "error",
+					Error:      "gagal memasukkan ke antrian duplikat: " + err.Error(),
+				})
+			} else {
+				messages = append(messages, messageStatus.Message{
+					FolderName: finalFolderName,
+					Status:     "duplicate_pending_review",
+					Error:      "nama sudah pernah di-approve — perlu direview manual di /duplicates",
+				})
+			}
 			continue
 		}
 

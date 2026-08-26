@@ -18,6 +18,7 @@ import (
 	BackupController "web_backend/Controller/BackupController"
 	Bookmarkcontroller "web_backend/Controller/BookmarkController"
 	BugReportController "web_backend/Controller/BugReportController"
+	DuplicateController "web_backend/Controller/DuplicateController"
 	folderController "web_backend/Controller/FolderControllers"
 	TranslateController "web_backend/Controller/TranslateController"
 	UploadController "web_backend/Controller/UploadController"
@@ -188,6 +189,11 @@ func main() {
 		protected.POST("/bug-reports", BugReportController.CreateBugReport)
 		protected.GET("/bug-reports", BugReportController.ListBugReports)
 		protected.PATCH("/bug-reports/:id/status", BugReportController.UpdateBugReportStatus)
+
+		protected.GET("/duplicates", DuplicateController.ListPending)
+		protected.GET("/duplicates/:id/compare", DuplicateController.Compare)
+		protected.POST("/duplicates/:id/resolve", DuplicateController.Resolve)
+		protected.POST("/duplicates/backfill", DuplicateController.Backfill)
 	}
 
 	r.Run(":" + appPort)
