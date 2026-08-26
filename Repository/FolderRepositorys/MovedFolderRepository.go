@@ -69,6 +69,14 @@ func copyDir(src, dst string, onFileDone func()) error {
 	return nil
 }
 
+// CopyPaste exposes copyPaste to other packages (e.g. DuplicateRepositorys'
+// "merge - replace" resolution, which deliberately wants the overwrite
+// behaviour documented below — the user has explicitly chosen to let the
+// new version win).
+func CopyPaste(source, destination string, onFileDone func()) error {
+	return copyPaste(source, destination, onFileDone)
+}
+
 func copyPaste(source, destination string, onFileDone func()) error {
 	entries, err := os.ReadDir(source)
 	if err != nil {
