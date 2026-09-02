@@ -4,6 +4,7 @@ services:
   app:
     build: .
     container_name: go-backend
+    init: true
     restart: unless-stopped
     depends_on:
       mysql:
