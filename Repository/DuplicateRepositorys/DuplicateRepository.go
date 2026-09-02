@@ -8,6 +8,8 @@
 package DuplicateRepositorys
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -17,6 +19,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"sync"
 	"time"
 
 	"gorm.io/gorm"
@@ -134,9 +137,29 @@ func buildPageURL(staticSegment, folderName, fileName string) string {
 	return u.String()
 }
 
+// sha256File hashes a file's content, used by GetCandidateForCompare to tell
+// "changed" (same filename, different bytes) apart from "unchanged" (same
+// filename, same bytes) — filename alone can't distinguish those two cases.
+func sha256File(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
 // GetCandidateForCompare backs the /duplicates/:id/compare page — unlike
 // ListPending, this does read the filesystem live (both sides), since this
-// is the one place that actually needs the current, exact page list.
+// is the one place that actually needs the current, exact page list. Each
+// page is tagged with a diff Status (added/removed/changed/unchanged) by
+// comparing filenames and, where a filename exists on both sides, content
+// hashes.
 func GetCandidateForCompare(idStr string) (*dto.DuplicateCompareResponse, error) {
 	db := connection.DB
 	id, err := strconv.Atoi(idStr)
@@ -153,8 +176,9 @@ func GetCandidateForCompare(idStr string) (*dto.DuplicateCompareResponse, error)
 	if err != nil {
 		return nil, fmt.Errorf("gagal mengambil data folder lama: %w", err)
 	}
+	existingDir := filepath.Join(os.Getenv("DST_DIR"), existingFolder.Name)
 
-	existingFiles, err := FolderRepositorys.ScanFiles(filepath.Join(os.Getenv("DST_DIR"), existingFolder.Name))
+	existingFiles, err := FolderRepositorys.ScanFiles(existingDir)
 	if err != nil {
 		return nil, fmt.Errorf("gagal membaca folder lama: %w", err)
 	}
@@ -165,20 +189,112 @@ func GetCandidateForCompare(idStr string) (*dto.DuplicateCompareResponse, error)
 	sort.Strings(existingFiles)
 	sort.Strings(incomingFiles)
 
+	incomingSet := make(map[string]bool, len(incomingFiles))
+	for _, f := range incomingFiles {
+		incomingSet[f] = true
+	}
+
+	var sharedNames []string
+	for _, f := range existingFiles {
+		if incomingSet[f] {
+			sharedNames = append(sharedNames, f)
+		}
+	}
+	sharedStatus, err := diffSharedFiles(existingDir, candidate.IncomingPath, sharedNames)
+	if err != nil {
+		return nil, err
+	}
+
 	resp := &dto.DuplicateCompareResponse{ID: candidate.ID, Name: candidate.Name}
 	for _, f := range existingFiles {
+		status, ok := sharedStatus[f]
+		if !ok {
+			status = "removed"
+		}
 		resp.ExistingPages = append(resp.ExistingPages, dto.DuplicateComparePage{
-			Name: f,
-			URL:  buildPageURL("new", existingFolder.Name, f),
+			Name:   f,
+			URL:    buildPageURL("new", existingFolder.Name, f),
+			Status: status,
 		})
 	}
 	for _, f := range incomingFiles {
+		status, ok := sharedStatus[f]
+		if !ok {
+			status = "added"
+		}
 		resp.IncomingPages = append(resp.IncomingPages, dto.DuplicateComparePage{
-			Name: f,
-			URL:  buildPageURL("sementara", candidate.Name, f),
+			Name:   f,
+			URL:    buildPageURL("sementara", candidate.Name, f),
+			Status: status,
 		})
 	}
 	return resp, nil
+}
+
+// diffSharedFiles compares, for each filename present on both sides, the
+// existing and incoming file and returns its diff status ("unchanged" or
+// "changed"). Runs with bounded concurrency — hashing hundreds of pages one
+// at a time against slow/network storage is what previously made
+// GetCandidateForCompare blow past Laravel's 30s HTTP timeout on folders
+// with many matching pages.
+func diffSharedFiles(existingDir, incomingDir string, names []string) (map[string]string, error) {
+	const maxConcurrency = 8
+
+	results := make([]string, len(names))
+	errs := make([]error, len(names))
+
+	sem := make(chan struct{}, maxConcurrency)
+	var wg sync.WaitGroup
+	for i, name := range names {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(i int, name string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			results[i], errs[i] = diffStatus(filepath.Join(existingDir, name), filepath.Join(incomingDir, name))
+		}(i, name)
+	}
+	wg.Wait()
+
+	status := make(map[string]string, len(names))
+	for i, name := range names {
+		if errs[i] != nil {
+			return nil, fmt.Errorf("gagal membandingkan file %q: %w", name, errs[i])
+		}
+		status[name] = results[i]
+	}
+	return status, nil
+}
+
+// diffStatus is only called for a filename present on both sides — checks
+// file size first (a cheap os.Stat, no content read) since differently-sized
+// files can never be byte-identical, and only falls back to a full content
+// hash when the sizes match.
+func diffStatus(existingPath, incomingPath string) (string, error) {
+	existingInfo, err := os.Stat(existingPath)
+	if err != nil {
+		return "", err
+	}
+	incomingInfo, err := os.Stat(incomingPath)
+	if err != nil {
+		return "", err
+	}
+	if existingInfo.Size() != incomingInfo.Size() {
+		return "changed", nil
+	}
+
+	existingHash, err := sha256File(existingPath)
+	if err != nil {
+		return "", err
+	}
+	incomingHash, err := sha256File(incomingPath)
+	if err != nil {
+		return "", err
+	}
+	if existingHash == incomingHash {
+		return "unchanged", nil
+	}
+	return "changed", nil
 }
 
 // nameExistsAnywhere is the cross-table check that was missing entirely
@@ -257,9 +373,11 @@ func ResolveNewTitle(idStr, newTitle string) error {
 }
 
 // ResolveMerge implements the two "merge" actions:
-//   - replace: the incoming version wins outright, overwriting the
-//     existing DST_DIR folder (deliberately reuses CopyPaste's overwrite
-//     behaviour — the user has explicitly opted into it here).
+//   - replace: the incoming version wins outright — the existing DST_DIR
+//     folder is wiped first, then fully replaced by the incoming files, so
+//     no stale pages from the old version can survive under a filename the
+//     new version doesn't have (a plain overlay copy would leave those
+//     behind).
 //   - append: incoming pages are copied in as new, renumbered pages after
 //     the existing ones, so filenames never collide.
 func ResolveMerge(idStr, mode string) error {
@@ -289,6 +407,9 @@ func ResolveMerge(idStr, mode string) error {
 
 	var newThumbnail string
 	if mode == "replace" {
+		if err := os.RemoveAll(destPath); err != nil {
+			return fmt.Errorf("gagal menghapus folder lama sebelum replace: %w", err)
+		}
 		if err := FolderRepositorys.CopyPaste(candidate.IncomingPath, destPath, nil); err != nil {
 			return fmt.Errorf("gagal menyalin file (replace): %w", err)
 		}
@@ -318,6 +439,36 @@ func ResolveMerge(idStr, mode string) error {
 			"resolved_at":     now,
 		}).Error
 	})
+}
+
+// ResolveKeepExisting implements the "pakai versi lama" action: discard the
+// incoming SRC_DIR folder outright and leave the existing DST_DIR/new_folders
+// entry completely untouched.
+func ResolveKeepExisting(idStr string) error {
+	db := connection.DB
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		return errors.New("invalid id")
+	}
+
+	var candidate DuplicateCandidate.DuplicateCandidate
+	if err := db.First(&candidate, id).Error; err != nil {
+		return err
+	}
+	if candidate.Status != "pending" {
+		return fmt.Errorf("kandidat ini sudah diresolve sebelumnya (status: %s)", candidate.Status)
+	}
+
+	if err := os.RemoveAll(candidate.IncomingPath); err != nil {
+		return fmt.Errorf("gagal menghapus folder incoming: %w", err)
+	}
+
+	now := time.Now()
+	return db.Model(&candidate).Updates(map[string]any{
+		"status":          "resolved_kept_existing",
+		"resolution_note": "keep_existing",
+		"resolved_at":     now,
+	}).Error
 }
 
 // appendPages copies every file from incomingPath into destPath, renumbered

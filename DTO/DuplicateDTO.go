@@ -15,9 +15,14 @@ type DuplicateCandidateItem struct {
 }
 
 // DuplicateComparePage is one page/image on either side of the compare view.
+// Status is "added" (only on the incoming side), "removed" (only on the
+// existing side), "changed" (same filename, different content hash), or
+// "unchanged" (same filename, same content hash) — computed by diffing
+// ExistingPages/IncomingPages by filename+sha256 in GetCandidateForCompare.
 type DuplicateComparePage struct {
-	Name string `json:"name"`
-	URL  string `json:"url"`
+	Name   string `json:"name"`
+	URL    string `json:"url"`
+	Status string `json:"status"`
 }
 
 // DuplicateCompareResponse backs the /duplicates/:id/compare page — full
@@ -31,8 +36,8 @@ type DuplicateCompareResponse struct {
 }
 
 // ResolveDuplicateRequest is the body for POST /duplicates/:id/resolve.
-// Action is "new_title" (needs NewTitle) or "merge" (needs MergeMode,
-// "replace" or "append").
+// Action is "new_title" (needs NewTitle), "merge" (needs MergeMode, "replace"
+// or "append"), or "keep_existing" (discards the incoming folder outright).
 type ResolveDuplicateRequest struct {
 	Action    string `json:"action" binding:"required"`
 	NewTitle  string `json:"new_title"`

@@ -61,8 +61,10 @@ func Resolve(c *gin.Context) {
 			return
 		}
 		err = DuplicateRepositorys.ResolveMerge(id, request.MergeMode)
+	case "keep_existing":
+		err = DuplicateRepositorys.ResolveKeepExisting(id)
 	default:
-		c.JSON(http.StatusBadRequest, model.BaseResponseModel{CodeResponse: 400, HeaderMessage: "Bad Request", Message: "action must be 'new_title' or 'merge'", Data: nil})
+		c.JSON(http.StatusBadRequest, model.BaseResponseModel{CodeResponse: 400, HeaderMessage: "Bad Request", Message: "action must be 'new_title', 'merge', or 'keep_existing'", Data: nil})
 		return
 	}
 
