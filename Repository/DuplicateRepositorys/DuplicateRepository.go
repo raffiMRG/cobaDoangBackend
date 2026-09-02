@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/url"
 	"os"
 	"path"
@@ -161,6 +162,7 @@ func sha256File(path string) (string, error) {
 // comparing filenames and, where a filename exists on both sides, content
 // hashes.
 func GetCandidateForCompare(idStr string) (*dto.DuplicateCompareResponse, error) {
+	start := time.Now()
 	db := connection.DB
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
@@ -178,6 +180,7 @@ func GetCandidateForCompare(idStr string) (*dto.DuplicateCompareResponse, error)
 	}
 	existingDir := filepath.Join(os.Getenv("DST_DIR"), existingFolder.Name)
 
+	scanStart := time.Now()
 	existingFiles, err := FolderRepositorys.ScanFiles(existingDir)
 	if err != nil {
 		return nil, fmt.Errorf("gagal membaca folder lama: %w", err)
@@ -186,6 +189,7 @@ func GetCandidateForCompare(idStr string) (*dto.DuplicateCompareResponse, error)
 	if err != nil {
 		return nil, fmt.Errorf("gagal membaca folder baru: %w", err)
 	}
+	log.Printf("[duplicates/compare id=%d] ScanFiles selesai dalam %s (existing=%d, incoming=%d)", id, time.Since(scanStart), len(existingFiles), len(incomingFiles))
 	sort.Strings(existingFiles)
 	sort.Strings(incomingFiles)
 
@@ -200,10 +204,15 @@ func GetCandidateForCompare(idStr string) (*dto.DuplicateCompareResponse, error)
 			sharedNames = append(sharedNames, f)
 		}
 	}
+	hashStart := time.Now()
 	sharedStatus, err := diffSharedFiles(existingDir, candidate.IncomingPath, sharedNames)
 	if err != nil {
 		return nil, err
 	}
+	log.Printf("[duplicates/compare id=%d] diffSharedFiles selesai dalam %s (shared=%d)", id, time.Since(hashStart), len(sharedNames))
+	defer func() {
+		log.Printf("[duplicates/compare id=%d] total %s", id, time.Since(start))
+	}()
 
 	resp := &dto.DuplicateCompareResponse{ID: candidate.ID, Name: candidate.Name}
 	for _, f := range existingFiles {
