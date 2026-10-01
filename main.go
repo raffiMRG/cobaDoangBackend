@@ -180,6 +180,10 @@ func main() {
 
 		protected.POST("/upload/folder", UploadController.UploadFolder)
 
+		protected.GET("/translate/settings", TranslateController.GetSettings)
+		protected.GET("/translate/settings/worker", TranslateController.GetWorkerSettings)
+		protected.PUT("/translate/settings", TranslateController.SaveSettings)
+		protected.DELETE("/translate/settings", TranslateController.ResetSettings)
 		protected.POST("/translate/:id/request", TranslateController.RequestTranslation)
 		protected.DELETE("/translate/:id", TranslateController.CancelTranslation)
 		protected.GET("/translate/pending", TranslateController.ListPending)

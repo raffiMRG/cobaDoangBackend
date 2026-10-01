@@ -96,3 +96,34 @@ func CompleteTranslation(c *gin.Context) {
 	response := TranslateRepositorys.CompleteTranslation(id, newFolderName, files)
 	c.JSON(response.CodeResponse, response)
 }
+
+func GetSettings(c *gin.Context) {
+	response := TranslateRepositorys.GetSettings()
+	c.JSON(response.CodeResponse, response)
+}
+
+func GetWorkerSettings(c *gin.Context) {
+	response := TranslateRepositorys.GetWorkerSettings()
+	c.JSON(response.CodeResponse, response)
+}
+
+func SaveSettings(c *gin.Context) {
+	var request dto.TranslatorSettingsRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, model.BaseResponseModel{
+			CodeResponse:  400,
+			HeaderMessage: "Bad Request",
+			Message:       err.Error(),
+			Data:          nil,
+		})
+		return
+	}
+
+	response := TranslateRepositorys.SaveSettings(request)
+	c.JSON(response.CodeResponse, response)
+}
+
+func ResetSettings(c *gin.Context) {
+	response := TranslateRepositorys.ResetSettings()
+	c.JSON(response.CodeResponse, response)
+}
