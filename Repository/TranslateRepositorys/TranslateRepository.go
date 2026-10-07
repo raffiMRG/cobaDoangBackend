@@ -102,13 +102,15 @@ func CancelTranslation(folderIdStr string) model.BaseResponseModel {
 }
 
 // ListPendingTranslations backs the /translate batch page — every manga
-// currently queued (not yet picked up by a worker).
+// not yet translated: queued, being processed right now, or failed (so a
+// reload mid-batch doesn't hide in-flight/failed items). Completed ones
+// drop out, which is what makes them vanish from the list.
 func ListPendingTranslations() ([]dto.PendingTranslationItem, error) {
 	var items []dto.PendingTranslationItem
 	err := connection.DB.Table("translations t").
-		Select("t.folder_id, nf.name, nf.thumbnail").
+		Select("t.folder_id, t.status, nf.name, nf.thumbnail").
 		Joins("JOIN new_folders nf ON nf.id = t.folder_id").
-		Where("t.status = ?", "pending").
+		Where("t.status IN ?", []string{"pending", "processing", "failed"}).
 		Order("t.created_at ASC").
 		Scan(&items).Error
 	return items, err
