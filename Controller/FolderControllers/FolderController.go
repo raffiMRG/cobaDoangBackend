@@ -25,6 +25,15 @@ import (
 	"web_backend/Repository/FolderRepositorys"
 )
 
+// @Summary Cari manga (new_folders) berdasarkan nama
+// @Tags manga
+// @Produce json
+// @Param q query string true "Keyword"
+// @Param page query int false "Halaman (20 per halaman)" default(1)
+// @Success 200 {object} object{page=int,per_page=int,total_data=int,data=[]object}
+// @Failure 400 {object} object{error=string}
+// @Security BearerAuth
+// @Router /search [get]
 func SearchFolders(c *gin.Context) {
 	keyword := c.Query("q")
 	if keyword == "" {
@@ -53,6 +62,13 @@ func SearchFolders(c *gin.Context) {
 	})
 }
 
+// @Summary Scan SRC_DIR dan sinkronkan tabel folders
+// @Description Insert folder baru, hapus row yatim, dan antrikan nama yang sudah pernah di-approve ke /duplicates.
+// @Tags folders
+// @Produce json
+// @Success 200 {object} object{messages=[]messageStatus.Message}
+// @Security BearerAuth
+// @Router /update [get]
 func UpdateAndInsert(c *gin.Context) {
 
 	root := os.Getenv("SRC_DIR") // Change to your desired root directory
@@ -202,6 +218,14 @@ func UpdateAndInsert(c *gin.Context) {
 	})
 }
 
+// @Summary List folder di staging (folders)
+// @Tags folders
+// @Produce json
+// @Param page query int false "Halaman" default(1)
+// @Param limit query int false "Item per halaman" default(10)
+// @Success 200 {object} model.BaseResponseModel
+// @Security BearerAuth
+// @Router /folders [get]
 func DisplayAllDataFolder(c *gin.Context) {
 	// var response model.BaseResponseModel
 	// Baca query params: ?page=2&limit=20
@@ -217,6 +241,13 @@ func DisplayAllDataFolder(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
+// @Summary List manga selesai (new_folders)
+// @Tags manga
+// @Produce json
+// @Param page query int false "Halaman (20 per halaman)" default(1)
+// @Success 200 {object} model.BaseResponseModel
+// @Security BearerAuth
+// @Router /newFolders [get]
 func DisplayDataNewfolder(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	// limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
@@ -234,6 +265,14 @@ func DisplayDataNewfolder(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
+// @Summary Detail manga + daftar halaman
+// @Tags manga
+// @Produce json
+// @Param id path int true "new_folders.id"
+// @Success 200 {object} model.BaseResponseModel{Data=dto.NewFolderResponse}
+// @Failure 404 {object} model.BaseResponseModel
+// @Security BearerAuth
+// @Router /id/{id} [get]
 func GetDataById(c *gin.Context) {
 	var response model.BaseResponseModel
 
@@ -248,6 +287,16 @@ func GetDataById(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
+// @Summary Rename manga
+// @Tags manga
+// @Accept json
+// @Produce json
+// @Param id path int true "new_folders.id"
+// @Param body body dto.RenameNewFolderRequest true "Nama baru"
+// @Success 200 {object} model.BaseResponseModel
+// @Failure 400 {object} model.BaseResponseModel
+// @Security BearerAuth
+// @Router /id/{id} [patch]
 func RenameNewFolder(c *gin.Context) {
 	var request dto.RenameNewFolderRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -265,6 +314,15 @@ func RenameNewFolder(c *gin.Context) {
 	c.JSON(response.CodeResponse, response)
 }
 
+// @Summary Hapus manga
+// @Tags manga
+// @Accept json
+// @Produce json
+// @Param id path int true "new_folders.id"
+// @Param body body dto.DeleteNewFolderRequest true "apply_to_disk=true juga menghapus folder di DST_DIR"
+// @Success 200 {object} model.BaseResponseModel
+// @Security BearerAuth
+// @Router /id/{id} [delete]
 func DeleteNewFolder(c *gin.Context) {
 	var request dto.DeleteNewFolderRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -305,6 +363,15 @@ func MoveRow(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
+// @Summary Pindahkan folder staging ke DST_DIR (async)
+// @Description Mengembalikan task_id; pantau progres lewat GET /folders/progress/{taskID}.
+// @Tags folders
+// @Accept json
+// @Produce json
+// @Param body body dto.InputDataReq true "ID folders yang dipindah"
+// @Success 200 {object} model.BaseResponseModel{Data=object{task_id=string}}
+// @Security BearerAuth
+// @Router /folders [post]
 func MoveRowAndTrack(c *gin.Context) {
 	var request dto.InputDataReq
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -339,6 +406,15 @@ func MoveRowAndTrack(c *gin.Context) {
 // page's Delete counterpart to MoveRowAndTrack's Move. Reuses the same
 // GET /folders/progress/:taskID SSE endpoint; the frontend can point the
 // existing listenProgress() JS at this taskID without changes.
+// @Summary Hapus folder staging (async)
+// @Tags folders
+// @Accept json
+// @Produce json
+// @Param body body dto.InputDataReq true "ID folders yang dihapus"
+// @Success 200 {object} model.BaseResponseModel{Data=object{task_id=string}}
+// @Failure 400 {object} model.BaseResponseModel
+// @Security BearerAuth
+// @Router /folders/delete [post]
 func DeleteRowsAndTrack(c *gin.Context) {
 	var request dto.InputDataReq
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -375,6 +451,15 @@ func DeleteRowsAndTrack(c *gin.Context) {
 	})
 }
 
+// @Summary Progres move/delete (SSE)
+// @Description Server-Sent Events: `progress` (persen, float), lalu `done`.
+// @Tags folders
+// @Produce text/event-stream
+// @Param taskID path string true "task_id dari POST /folders atau /folders/delete"
+// @Success 200 {string} string "event stream"
+// @Failure 404 {string} string "Task not found"
+// @Security BearerAuth
+// @Router /folders/progress/{taskID} [get]
 func FolderProgress(c *gin.Context) {
 	taskID := c.Param("taskID")
 
@@ -427,6 +512,13 @@ func FolderProgress(c *gin.Context) {
 	c.Writer.Write([]byte("event: close\ndata: Connection closed\n\n"))
 	flusher.Flush()
 }
+
+// @Summary Folder staging yang belum selesai
+// @Tags folders
+// @Produce json
+// @Success 200 {object} model.BaseResponseModel
+// @Security BearerAuth
+// @Router /filteredDatas [get]
 func GetFilteredData(c *gin.Context) {
 	response := FolderRepositorys.FilteredData("folders", "new_folder")
 	if response.CodeResponse != 200 {

@@ -11,6 +11,16 @@ import (
 	"web_backend/Repository/AuthRepositorys"
 )
 
+// @Summary Login
+// @Description Tukar username/password dengan access token + refresh token.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param body body dto.LoginRequest true "Kredensial"
+// @Success 200 {object} model.BaseResponseModel{Data=dto.LoginResponse}
+// @Failure 400 {object} model.BaseResponseModel
+// @Failure 401 {object} model.BaseResponseModel
+// @Router /login [post]
 func Login(c *gin.Context) {
 	var request dto.LoginRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -78,6 +88,14 @@ func Login(c *gin.Context) {
 	})
 }
 
+// @Summary Refresh access token
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param body body dto.RefreshRequest true "Refresh token"
+// @Success 200 {object} model.BaseResponseModel{Data=object{access_token=string}}
+// @Failure 401 {object} model.BaseResponseModel
+// @Router /refresh [post]
 func Refresh(c *gin.Context) {
 	var request dto.RefreshRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -123,6 +141,14 @@ func Refresh(c *gin.Context) {
 	})
 }
 
+// @Summary Logout (revoke refresh token)
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param body body dto.RefreshRequest true "Refresh token yang di-revoke"
+// @Success 200 {object} model.BaseResponseModel
+// @Security BearerAuth
+// @Router /logout [post]
 func Logout(c *gin.Context) {
 	var request dto.RefreshRequest
 	if err := c.ShouldBindJSON(&request); err != nil {

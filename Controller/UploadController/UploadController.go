@@ -11,6 +11,16 @@ import (
 	"web_backend/Repository/UploadRepositorys"
 )
 
+// @Summary Upload folder manga ke SRC_DIR
+// @Tags upload
+// @Accept multipart/form-data
+// @Produce json
+// @Param folder_name formData string true "Nama folder"
+// @Param files formData []file true "Halaman-halaman (boleh banyak)" collectionFormat(multi)
+// @Success 200 {object} model.BaseResponseModel{Data=object{folder_name=string,files_written=int,files_skipped=int}}
+// @Failure 400 {object} model.BaseResponseModel
+// @Security BearerAuth
+// @Router /upload/folder [post]
 func UploadFolder(c *gin.Context) {
 	form, err := c.MultipartForm()
 	if err != nil {

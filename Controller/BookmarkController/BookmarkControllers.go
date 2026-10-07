@@ -14,6 +14,14 @@ import (
 )
 
 // GET /bookmarks
+// @Summary List bookmark
+// @Tags bookmarks
+// @Produce json
+// @Param page query int false "Halaman" default(1)
+// @Param limit query int false "Item per halaman" default(10)
+// @Success 200 {object} model.BaseResponseModel{Data=object{items=[]Bookmark.BookmarkRes,total=int,page=int,limit=int,pages=int}}
+// @Security BearerAuth
+// @Router /bookmarks [get]
 func GetBookmarks(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
@@ -70,6 +78,14 @@ func GetBookmarks(c *gin.Context) {
 }
 
 // GET /bookmarks/:id
+// @Summary Detail bookmark
+// @Tags bookmarks
+// @Produce json
+// @Param id path int true "bookmarks.id"
+// @Success 200 {object} Bookmark.Bookmark
+// @Failure 404 {object} object{error=string}
+// @Security BearerAuth
+// @Router /bookmarks/{id} [get]
 func GetBookmark(c *gin.Context) {
 	db := connection.DB
 	var bookmark Bookmark.Bookmark
@@ -82,6 +98,17 @@ func GetBookmark(c *gin.Context) {
 }
 
 // POST /bookmarks
+// @Summary Toggle bookmark manga
+// @Description Hapus kalau sudah di-bookmark (200), buat kalau belum (201).
+// @Tags bookmarks
+// @Accept json
+// @Produce json
+// @Param body body object{folder_id=int} true "new_folders.id"
+// @Success 200 {object} object{message=string,is_bookmarked=bool,folder_id=int}
+// @Success 201 {object} object{id=int,folder_id=int,is_bookmarked=bool,created_at=string}
+// @Failure 400 {object} object{error=string}
+// @Security BearerAuth
+// @Router /bookmarks [post]
 func ToggleBookmark(c *gin.Context) {
 	db := connection.DB
 
@@ -153,6 +180,13 @@ func CreateBookmark(c *gin.Context) {
 }
 
 // DELETE /bookmarks/:id
+// @Summary Hapus bookmark
+// @Tags bookmarks
+// @Produce json
+// @Param id path int true "bookmarks.id"
+// @Success 200 {object} object{message=string}
+// @Security BearerAuth
+// @Router /bookmarks/{id} [delete]
 func DeleteBookmark(c *gin.Context) {
 	db := connection.DB
 	if err := db.Delete(&Bookmark.Bookmark{}, c.Param("id")).Error; err != nil {

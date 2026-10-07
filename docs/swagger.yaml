@@ -1,0 +1,1442 @@
+basePath: /
+definitions:
+  Bookmark.Bookmark:
+    properties:
+      created_at:
+        type: string
+      folder:
+        $ref: '#/definitions/NewFolder.NewFolder'
+      folder_id:
+        type: integer
+      id:
+        type: integer
+    type: object
+  Bookmark.BookmarkRes:
+    properties:
+      bookmark_id:
+        type: integer
+      created_at:
+        type: string
+      folder_id:
+        type: integer
+      folder_name:
+        type: string
+      folder_thumbnail:
+        type: string
+    type: object
+  MessageStatus.Message:
+    properties:
+      error:
+        type: string
+      folder_name:
+        type: string
+      status:
+        type: string
+    type: object
+  Model.BaseResponseModel:
+    properties:
+      Code:
+        type: integer
+      Data: {}
+      HeaderMessage:
+        type: string
+      Message:
+        type: string
+    type: object
+  NewFolder.NewFolder:
+    properties:
+      create_at:
+        type: string
+      id:
+        type: integer
+      is_completed:
+        type: boolean
+      name:
+        type: string
+      thumbnail:
+        type: string
+    type: object
+  dto.BackfillResult:
+    properties:
+      converted:
+        type: integer
+      errors:
+        items:
+          type: string
+        type: array
+    type: object
+  dto.BugReportItem:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      folder_id:
+        type: integer
+      folder_name:
+        type: string
+      id:
+        type: integer
+      status:
+        type: string
+      thumbnail:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  dto.CreateBugReportRequest:
+    properties:
+      description:
+        type: string
+      folder_id:
+        type: integer
+    required:
+    - description
+    - folder_id
+    type: object
+  dto.DeleteNewFolderRequest:
+    properties:
+      apply_to_disk:
+        type: boolean
+    type: object
+  dto.DuplicateCandidateItem:
+    properties:
+      created_at:
+        type: string
+      existing_new_folder_id:
+        type: integer
+      existing_page_count:
+        type: integer
+      existing_thumbnail:
+        type: string
+      id:
+        type: integer
+      incoming_page_count:
+        type: integer
+      name:
+        type: string
+    type: object
+  dto.DuplicateComparePage:
+    properties:
+      name:
+        type: string
+      status:
+        type: string
+      url:
+        type: string
+    type: object
+  dto.DuplicateCompareResponse:
+    properties:
+      existing_pages:
+        items:
+          $ref: '#/definitions/dto.DuplicateComparePage'
+        type: array
+      id:
+        type: integer
+      incoming_pages:
+        items:
+          $ref: '#/definitions/dto.DuplicateComparePage'
+        type: array
+      name:
+        type: string
+    type: object
+  dto.InputDataReq:
+    properties:
+      Id:
+        items:
+          type: integer
+        type: array
+    type: object
+  dto.LoginRequest:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  dto.LoginResponse:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+    type: object
+  dto.NewFolderResponse:
+    properties:
+      create_at:
+        type: string
+      id:
+        type: integer
+      is_bookmarked:
+        type: boolean
+      is_completed:
+        type: boolean
+      is_translated:
+        type: boolean
+      name:
+        type: string
+      page:
+        items:
+          type: string
+        type: array
+      thumbnail:
+        type: string
+      translation_error:
+        type: string
+      translation_status:
+        type: string
+    type: object
+  dto.PendingTranslationItem:
+    properties:
+      folder_id:
+        type: integer
+      name:
+        type: string
+      status:
+        type: string
+      thumbnail:
+        type: string
+    type: object
+  dto.RefreshRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  dto.RenameNewFolderRequest:
+    properties:
+      apply_to_disk:
+        type: boolean
+      new_name:
+        type: string
+    required:
+    - new_name
+    type: object
+  dto.ResolveDuplicateRequest:
+    properties:
+      action:
+        type: string
+      merge_mode:
+        type: string
+      new_title:
+        type: string
+    required:
+    - action
+    type: object
+  dto.TranslatorSettingsRequest:
+    properties:
+      api_base:
+        type: string
+      api_key:
+        description: empty = keep the stored key
+        type: string
+      api_model:
+        type: string
+      clear_api_key:
+        description: true = remove the stored key
+        type: boolean
+      detection_size:
+        type: integer
+      detector:
+        type: string
+      gpu_mode:
+        type: string
+      inpainter:
+        type: string
+      inpainting_precision:
+        type: string
+      inpainting_size:
+        type: integer
+      ocr:
+        type: string
+      target_lang:
+        type: string
+      translator:
+        type: string
+    required:
+    - detection_size
+    - detector
+    - gpu_mode
+    - inpainter
+    - inpainting_precision
+    - inpainting_size
+    - ocr
+    - target_lang
+    - translator
+    type: object
+  dto.TranslatorSettingsResponse:
+    properties:
+      api_base:
+        type: string
+      api_model:
+        type: string
+      detection_size:
+        type: integer
+      detector:
+        type: string
+      gpu_mode:
+        type: string
+      has_api_key:
+        type: boolean
+      inpainter:
+        type: string
+      inpainting_precision:
+        type: string
+      inpainting_size:
+        type: integer
+      is_default:
+        type: boolean
+      ocr:
+        type: string
+      target_lang:
+        type: string
+      translator:
+        type: string
+    type: object
+  dto.UpdateBugReportStatusRequest:
+    properties:
+      status:
+        description: '"open" | "fixed"'
+        type: string
+    required:
+    - status
+    type: object
+  dto.UpdateTranslationStatusRequest:
+    properties:
+      error_message:
+        type: string
+      status:
+        type: string
+    required:
+    - status
+    type: object
+info:
+  contact: {}
+  description: |-
+    Backend Go untuk manga library: scan/move folder, bookmark, translate, bug report, duplikat.
+    Login lewat POST /login, lalu klik Authorize dan isi `Bearer <access_token>`.
+  title: Manga Library API
+  version: "1.0"
+paths:
+  /bookmarks:
+    get:
+      parameters:
+      - default: 1
+        description: Halaman
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Item per halaman
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/Model.BaseResponseModel'
+            - properties:
+                Data:
+                  properties:
+                    items:
+                      items:
+                        $ref: '#/definitions/Bookmark.BookmarkRes'
+                      type: array
+                    limit:
+                      type: integer
+                    page:
+                      type: integer
+                    pages:
+                      type: integer
+                    total:
+                      type: integer
+                  type: object
+              type: object
+      security:
+      - BearerAuth: []
+      summary: List bookmark
+      tags:
+      - bookmarks
+    post:
+      consumes:
+      - application/json
+      description: Hapus kalau sudah di-bookmark (200), buat kalau belum (201).
+      parameters:
+      - description: new_folders.id
+        in: body
+        name: body
+        required: true
+        schema:
+          properties:
+            folder_id:
+              type: integer
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              folder_id:
+                type: integer
+              is_bookmarked:
+                type: boolean
+              message:
+                type: string
+            type: object
+        "201":
+          description: Created
+          schema:
+            properties:
+              created_at:
+                type: string
+              folder_id:
+                type: integer
+              id:
+                type: integer
+              is_bookmarked:
+                type: boolean
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Toggle bookmark manga
+      tags:
+      - bookmarks
+  /bookmarks/{id}:
+    delete:
+      parameters:
+      - description: bookmarks.id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Hapus bookmark
+      tags:
+      - bookmarks
+    get:
+      parameters:
+      - description: bookmarks.id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Bookmark.Bookmark'
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Detail bookmark
+      tags:
+      - bookmarks
+  /bug-reports:
+    get:
+      parameters:
+      - default: all
+        description: Filter status
+        enum:
+        - all
+        - open
+        - fixed
+        in: query
+        name: status
+        type: string
+      - default: newest
+        description: Urutan
+        enum:
+        - newest
+        - oldest
+        in: query
+        name: sort
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/Model.BaseResponseModel'
+            - properties:
+                Data:
+                  items:
+                    $ref: '#/definitions/dto.BugReportItem'
+                  type: array
+              type: object
+      security:
+      - BearerAuth: []
+      summary: List bug report
+      tags:
+      - bug-reports
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Laporan
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateBugReportRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+      security:
+      - BearerAuth: []
+      summary: Laporkan bug pada manga
+      tags:
+      - bug-reports
+  /bug-reports/{id}/status:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: bug_reports.id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 'status: open|fixed'
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateBugReportStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+      security:
+      - BearerAuth: []
+      summary: Ubah status bug report
+      tags:
+      - bug-reports
+  /duplicates:
+    get:
+      parameters:
+      - default: 1
+        description: Halaman
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Item per halaman
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              data:
+                items:
+                  $ref: '#/definitions/dto.DuplicateCandidateItem'
+                type: array
+              page:
+                type: integer
+              per_page:
+                type: integer
+              total_data:
+                type: integer
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List kandidat duplikat yang belum direview
+      tags:
+      - duplicates
+  /duplicates/{id}/compare:
+    get:
+      parameters:
+      - description: duplicate_candidates.id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/Model.BaseResponseModel'
+            - properties:
+                Data:
+                  $ref: '#/definitions/dto.DuplicateCompareResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+      security:
+      - BearerAuth: []
+      summary: Bandingkan halaman existing vs incoming
+      tags:
+      - duplicates
+  /duplicates/{id}/resolve:
+    post:
+      consumes:
+      - application/json
+      description: 'action: new_title (butuh new_title), merge (butuh merge_mode replace|append),
+        keep_existing.'
+      parameters:
+      - description: duplicate_candidates.id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Aksi
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.ResolveDuplicateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+      security:
+      - BearerAuth: []
+      summary: Selesaikan kandidat duplikat
+      tags:
+      - duplicates
+  /duplicates/backfill:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/Model.BaseResponseModel'
+            - properties:
+                Data:
+                  $ref: '#/definitions/dto.BackfillResult'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Konversi tabrakan nama lama jadi kandidat duplikat
+      tags:
+      - duplicates
+  /export:
+    get:
+      parameters:
+      - default: full
+        description: full = schema+data, data = data saja
+        enum:
+        - full
+        - data
+        in: query
+        name: mode
+        type: string
+      produces:
+      - application/sql
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+      security:
+      - BearerAuth: []
+      summary: Export database (.sql)
+      tags:
+      - backup
+  /export/folders:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              type: string
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Export daftar nama folder di DST_DIR (.json)
+      tags:
+      - backup
+  /filteredDatas:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+      security:
+      - BearerAuth: []
+      summary: Folder staging yang belum selesai
+      tags:
+      - folders
+  /folders:
+    get:
+      parameters:
+      - default: 1
+        description: Halaman
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Item per halaman
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+      security:
+      - BearerAuth: []
+      summary: List folder di staging (folders)
+      tags:
+      - folders
+    post:
+      consumes:
+      - application/json
+      description: Mengembalikan task_id; pantau progres lewat GET /folders/progress/{taskID}.
+      parameters:
+      - description: ID folders yang dipindah
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.InputDataReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/Model.BaseResponseModel'
+            - properties:
+                Data:
+                  properties:
+                    task_id:
+                      type: string
+                  type: object
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Pindahkan folder staging ke DST_DIR (async)
+      tags:
+      - folders
+  /folders/delete:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID folders yang dihapus
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.InputDataReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/Model.BaseResponseModel'
+            - properties:
+                Data:
+                  properties:
+                    task_id:
+                      type: string
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+      security:
+      - BearerAuth: []
+      summary: Hapus folder staging (async)
+      tags:
+      - folders
+  /folders/progress/{taskID}:
+    get:
+      description: 'Server-Sent Events: `progress` (persen, float), lalu `done`.'
+      parameters:
+      - description: task_id dari POST /folders atau /folders/delete
+        in: path
+        name: taskID
+        required: true
+        type: string
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: event stream
+          schema:
+            type: string
+        "404":
+          description: Task not found
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Progres move/delete (SSE)
+      tags:
+      - folders
+  /id/{id}:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: new_folders.id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: apply_to_disk=true juga menghapus folder di DST_DIR
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.DeleteNewFolderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+      security:
+      - BearerAuth: []
+      summary: Hapus manga
+      tags:
+      - manga
+    get:
+      parameters:
+      - description: new_folders.id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/Model.BaseResponseModel'
+            - properties:
+                Data:
+                  $ref: '#/definitions/dto.NewFolderResponse'
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+      security:
+      - BearerAuth: []
+      summary: Detail manga + daftar halaman
+      tags:
+      - manga
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: new_folders.id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Nama baru
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RenameNewFolderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+      security:
+      - BearerAuth: []
+      summary: Rename manga
+      tags:
+      - manga
+  /import:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Kirim multipart field `file`, atau isi SQL mentah sebagai body.
+      parameters:
+      - description: File .sql
+        in: formData
+        name: file
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+      security:
+      - BearerAuth: []
+      summary: Import database dari file .sql
+      tags:
+      - backup
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: Tukar username/password dengan access token + refresh token.
+      parameters:
+      - description: Kredensial
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/Model.BaseResponseModel'
+            - properties:
+                Data:
+                  $ref: '#/definitions/dto.LoginResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+      summary: Login
+      tags:
+      - auth
+  /logout:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Refresh token yang di-revoke
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RefreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+      security:
+      - BearerAuth: []
+      summary: Logout (revoke refresh token)
+      tags:
+      - auth
+  /newFolders:
+    get:
+      parameters:
+      - default: 1
+        description: Halaman (20 per halaman)
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+      security:
+      - BearerAuth: []
+      summary: List manga selesai (new_folders)
+      tags:
+      - manga
+  /refresh:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Refresh token
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RefreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/Model.BaseResponseModel'
+            - properties:
+                Data:
+                  properties:
+                    access_token:
+                      type: string
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+      summary: Refresh access token
+      tags:
+      - auth
+  /search:
+    get:
+      parameters:
+      - description: Keyword
+        in: query
+        name: q
+        required: true
+        type: string
+      - default: 1
+        description: Halaman (20 per halaman)
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              data:
+                items:
+                  type: object
+                type: array
+              page:
+                type: integer
+              per_page:
+                type: integer
+              total_data:
+                type: integer
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Cari manga (new_folders) berdasarkan nama
+      tags:
+      - manga
+  /translate/{id}:
+    delete:
+      parameters:
+      - description: new_folders.id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+        "409":
+          description: Sedang diproses
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+      security:
+      - BearerAuth: []
+      summary: Keluarkan manga dari antrian translate
+      tags:
+      - translate
+  /translate/{id}/complete:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Simpan halaman hasil translate sebagai folder baru di DST_DIR dan
+        tandai request completed.
+      parameters:
+      - description: new_folders.id asal
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Nama folder hasil
+        in: formData
+        name: new_folder_name
+        required: true
+        type: string
+      - collectionFormat: multi
+        description: Halaman hasil translate
+        in: formData
+        items:
+          type: file
+        name: files
+        required: true
+        type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/Model.BaseResponseModel'
+            - properties:
+                Data:
+                  properties:
+                    files_skipped:
+                      type: integer
+                    files_written:
+                      type: integer
+                    name:
+                      type: string
+                    new_folder_id:
+                      type: integer
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+      security:
+      - BearerAuth: []
+      summary: Upload hasil translate (dipakai worker)
+      tags:
+      - translate
+  /translate/{id}/request:
+    post:
+      parameters:
+      - description: new_folders.id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/Model.BaseResponseModel'
+            - properties:
+                Data:
+                  properties:
+                    status:
+                      type: string
+                  type: object
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+      security:
+      - BearerAuth: []
+      summary: Masukkan manga ke antrian translate
+      tags:
+      - translate
+  /translate/{id}/status:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: new_folders.id
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 'status: pending|processing|completed|failed'
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateTranslationStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+      security:
+      - BearerAuth: []
+      summary: Update status translate (dipakai worker)
+      tags:
+      - translate
+  /translate/pending:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/Model.BaseResponseModel'
+            - properties:
+                Data:
+                  items:
+                    $ref: '#/definitions/dto.PendingTranslationItem'
+                  type: array
+              type: object
+      security:
+      - BearerAuth: []
+      summary: List antrian translate (pending/processing/failed)
+      tags:
+      - translate
+  /translate/settings:
+    delete:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+      security:
+      - BearerAuth: []
+      summary: Reset setting translator ke default
+      tags:
+      - translate
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/Model.BaseResponseModel'
+            - properties:
+                Data:
+                  $ref: '#/definitions/dto.TranslatorSettingsResponse'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Ambil setting translator (tanpa API key)
+      tags:
+      - translate
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Setting
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.TranslatorSettingsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+      security:
+      - BearerAuth: []
+      summary: Simpan setting translator
+      tags:
+      - translate
+  /translate/settings/worker:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+      security:
+      - BearerAuth: []
+      summary: Ambil setting translator untuk worker (termasuk API key)
+      tags:
+      - translate
+  /update:
+    get:
+      description: Insert folder baru, hapus row yatim, dan antrikan nama yang sudah
+        pernah di-approve ke /duplicates.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              messages:
+                items:
+                  $ref: '#/definitions/MessageStatus.Message'
+                type: array
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Scan SRC_DIR dan sinkronkan tabel folders
+      tags:
+      - folders
+  /upload/folder:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: Nama folder
+        in: formData
+        name: folder_name
+        required: true
+        type: string
+      - collectionFormat: multi
+        description: Halaman-halaman (boleh banyak)
+        in: formData
+        items:
+          type: file
+        name: files
+        required: true
+        type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/Model.BaseResponseModel'
+            - properties:
+                Data:
+                  properties:
+                    files_skipped:
+                      type: integer
+                    files_written:
+                      type: integer
+                    folder_name:
+                      type: string
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+      security:
+      - BearerAuth: []
+      summary: Upload folder manga ke SRC_DIR
+      tags:
+      - upload
+securityDefinitions:
+  BearerAuth:
+    description: 'Format: `Bearer <access_token>`'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

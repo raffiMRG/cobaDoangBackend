@@ -14,6 +14,14 @@ import (
 	"web_backend/Repository/FolderRepositorys"
 )
 
+// @Summary Export database (.sql)
+// @Tags backup
+// @Produce application/sql
+// @Param mode query string false "full = schema+data, data = data saja" Enums(full, data) default(full)
+// @Success 200 {file} file
+// @Failure 400 {object} model.BaseResponseModel
+// @Security BearerAuth
+// @Router /export [get]
 func Export(c *gin.Context) {
 	mode := c.DefaultQuery("mode", "full")
 	if mode != "full" && mode != "data" {
@@ -42,6 +50,12 @@ func Export(c *gin.Context) {
 	c.Data(http.StatusOK, "application/sql", []byte(sqlContent))
 }
 
+// @Summary Export daftar nama folder di DST_DIR (.json)
+// @Tags backup
+// @Produce json
+// @Success 200 {array} string
+// @Security BearerAuth
+// @Router /export/folders [get]
 func ExportDstFolders(c *gin.Context) {
 	names, err := FolderRepositorys.ScanDestinationFolderNames()
 	if err != nil {
@@ -59,6 +73,16 @@ func ExportDstFolders(c *gin.Context) {
 	c.JSON(http.StatusOK, names)
 }
 
+// @Summary Import database dari file .sql
+// @Description Kirim multipart field `file`, atau isi SQL mentah sebagai body.
+// @Tags backup
+// @Accept multipart/form-data
+// @Produce json
+// @Param file formData file false "File .sql"
+// @Success 200 {object} model.BaseResponseModel
+// @Failure 400 {object} model.BaseResponseModel
+// @Security BearerAuth
+// @Router /import [post]
 func Import(c *gin.Context) {
 	var content []byte
 

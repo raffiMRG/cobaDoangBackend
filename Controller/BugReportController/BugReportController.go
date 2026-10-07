@@ -10,6 +10,15 @@ import (
 	"web_backend/Repository/BugReportRepositorys"
 )
 
+// @Summary Laporkan bug pada manga
+// @Tags bug-reports
+// @Accept json
+// @Produce json
+// @Param body body dto.CreateBugReportRequest true "Laporan"
+// @Success 200 {object} model.BaseResponseModel
+// @Failure 400 {object} model.BaseResponseModel
+// @Security BearerAuth
+// @Router /bug-reports [post]
 func CreateBugReport(c *gin.Context) {
 	var request dto.CreateBugReportRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -26,6 +35,14 @@ func CreateBugReport(c *gin.Context) {
 	c.JSON(response.CodeResponse, response)
 }
 
+// @Summary List bug report
+// @Tags bug-reports
+// @Produce json
+// @Param status query string false "Filter status" Enums(all, open, fixed) default(all)
+// @Param sort query string false "Urutan" Enums(newest, oldest) default(newest)
+// @Success 200 {object} model.BaseResponseModel{Data=[]dto.BugReportItem}
+// @Security BearerAuth
+// @Router /bug-reports [get]
 func ListBugReports(c *gin.Context) {
 	status := c.DefaultQuery("status", "all")
 	sort := c.DefaultQuery("sort", "newest")
@@ -49,6 +66,16 @@ func ListBugReports(c *gin.Context) {
 	})
 }
 
+// @Summary Ubah status bug report
+// @Tags bug-reports
+// @Accept json
+// @Produce json
+// @Param id path int true "bug_reports.id"
+// @Param body body dto.UpdateBugReportStatusRequest true "status: open|fixed"
+// @Success 200 {object} model.BaseResponseModel
+// @Failure 400 {object} model.BaseResponseModel
+// @Security BearerAuth
+// @Router /bug-reports/{id}/status [patch]
 func UpdateBugReportStatus(c *gin.Context) {
 	var request dto.UpdateBugReportStatusRequest
 	if err := c.ShouldBindJSON(&request); err != nil {

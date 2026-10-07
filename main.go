@@ -13,6 +13,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 
 	AuthController "web_backend/Controller/AuthController"
 	BackupController "web_backend/Controller/BackupController"
@@ -25,8 +27,18 @@ import (
 	"web_backend/Middleware"
 	conn "web_backend/Model/Connection"
 	"web_backend/Repository/AuthRepositorys"
+	_ "web_backend/docs"
 )
 
+// @title           Manga Library API
+// @version         1.0
+// @description     Backend Go untuk manga library: scan/move folder, bookmark, translate, bug report, duplikat.
+// @description     Login lewat POST /login, lalu klik Authorize dan isi `Bearer <access_token>`.
+// @BasePath        /
+// @securityDefinitions.apikey BearerAuth
+// @in              header
+// @name            Authorization
+// @description     Format: `Bearer <access_token>`
 func main() {
 	var err error
 
@@ -141,6 +153,9 @@ func main() {
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok ready"})
 	})
+
+	// Regenerate docs/ after changing handler annotations: `swag init`.
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	r.POST("/login", AuthController.Login)
 	r.POST("/refresh", AuthController.Refresh)
