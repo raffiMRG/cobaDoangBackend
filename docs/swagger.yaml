@@ -997,6 +997,59 @@ paths:
       summary: Rename manga
       tags:
       - manga
+  /id/{id}/thumbnail:
+    post:
+      description: |-
+        Hitung ulang URL thumbnail dari isi folder di disk (halaman pertama, urutan sama dengan reader) dan simpan kalau berbeda dari yang di DB.
+        status: ok (sudah benar) | fixed (diperbarui). 409 kalau folder tidak ada di disk (folder_missing) atau tanpa gambar (no_image); DB tidak diubah.
+      parameters:
+      - description: new_folders.id
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/Model.BaseResponseModel'
+            - properties:
+                Data:
+                  properties:
+                    new:
+                      type: string
+                    old:
+                      type: string
+                    status:
+                      type: string
+                  type: object
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+        "409":
+          description: Conflict
+          schema:
+            allOf:
+            - $ref: '#/definitions/Model.BaseResponseModel'
+            - properties:
+                Data:
+                  properties:
+                    old:
+                      type: string
+                    status:
+                      type: string
+                  type: object
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Perbaiki thumbnail satu manga
+      tags:
+      - manga
   /import:
     post:
       consumes:

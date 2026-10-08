@@ -287,9 +287,16 @@ func moveOne(id int) error {
 		return err
 	}
 
+	// Recomputed from what actually landed in DST_DIR: the staging thumbnail
+	// was built at scan time and may be stale if the folder changed since.
+	thumbnail, err := BuildNewFolderThumbnailURL(row.Name, destination)
+	if err != nil {
+		thumbnail = strings.Replace(row.Thumbnail, "/sementara/", "/new/", 1)
+	}
+
 	newRow := NewFolder.NewFolder{
 		Name:        row.Name,
-		Thumbnail:   strings.Replace(row.Thumbnail, "/sementara/", "/new/", 1),
+		Thumbnail:   thumbnail,
 		IsCompleted: false,
 		CreateAt:    time.Now(),
 	}

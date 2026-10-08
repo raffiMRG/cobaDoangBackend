@@ -344,6 +344,22 @@ func DeleteNewFolder(c *gin.Context) {
 	c.JSON(response.CodeResponse, response)
 }
 
+// @Summary Perbaiki thumbnail satu manga
+// @Description Hitung ulang URL thumbnail dari isi folder di disk (halaman pertama, urutan sama dengan reader) dan simpan kalau berbeda dari yang di DB.
+// @Description status: ok (sudah benar) | fixed (diperbarui). 409 kalau folder tidak ada di disk (folder_missing) atau tanpa gambar (no_image); DB tidak diubah.
+// @Tags manga
+// @Produce json
+// @Param id path int true "new_folders.id"
+// @Success 200 {object} model.BaseResponseModel{Data=object{status=string,old=string,new=string}}
+// @Failure 404 {object} model.BaseResponseModel
+// @Failure 409 {object} model.BaseResponseModel{Data=object{status=string,old=string}}
+// @Security BearerAuth
+// @Router /id/{id}/thumbnail [post]
+func RepairThumbnail(c *gin.Context) {
+	response := FolderRepositorys.RepairNewFolderThumbnail(c.Param("id"))
+	c.JSON(response.CodeResponse, response)
+}
+
 func MoveRow(c *gin.Context) {
 	var request dto.InputDataReq
 	var response model.BaseResponseModel

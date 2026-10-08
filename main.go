@@ -174,6 +174,7 @@ func main() {
 		protected.GET("/id/:id", folderController.GetDataById)
 		protected.PATCH("/id/:id", folderController.RenameNewFolder)
 		protected.DELETE("/id/:id", folderController.DeleteNewFolder)
+		protected.POST("/id/:id/thumbnail", folderController.RepairThumbnail)
 
 		// protected.POST("/folders", folderController.MoveRow)
 		protected.POST("/folders", folderController.MoveRowAndTrack)

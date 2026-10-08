@@ -128,8 +128,12 @@ func ScanDestinationFolderNames() ([]string, error) {
 	return names, nil
 }
 
-// buildFileURL reads folderPath's first file and builds a URL for it under
-// the given static-serving path segment (e.g. "sementara" or "new").
+// buildFileURL builds the canonical thumbnail URL for folderPath under the
+// given static-serving path segment ("sementara" or "new"): its first page
+// in reader order (firstPageFile, see Pages.go). This is the only place
+// thumbnail URLs are built, so every writer (scan, move, upload, translate,
+// rename, duplicate resolve, repair) agrees with the reader's page 1.
+// Errors are ErrFolderMissing / ErrNoImage for those two cases.
 func buildFileURL(staticSegment, folderName, folderPath string) (string, error) {
 	apiBaseUrl := os.Getenv("API_BASEURL")
 
@@ -137,16 +141,13 @@ func buildFileURL(staticSegment, folderName, folderPath string) (string, error) 
 		return "", errors.New("folder name cannot be empty")
 	}
 
-	files, err := os.ReadDir(folderPath)
+	first, err := firstPageFile(folderPath)
 	if err != nil {
-		return "", errors.New("folder does not exist")
-	}
-	if len(files) == 0 {
-		return "", errors.New("folder is empty")
+		return "", err
 	}
 
 	fileURL, _ := url.Parse(apiBaseUrl + "/" + staticSegment + "/")
-	fileURL.Path = path.Join(fileURL.Path, folderName, files[0].Name())
+	fileURL.Path = path.Join(fileURL.Path, folderName, first)
 
 	return fileURL.String(), nil
 }
@@ -397,8 +398,9 @@ func GetNewfolderDataFromId(id string) model.BaseResponseModel {
 	scanPath := dstPath + "/" + listData.Name
 	fmt.Println("Scanning path:", scanPath)
 
-	// scan folder dan ambil page
-	if pages, err = ScanFiles(scanPath); err != nil {
+	// Same order and image-only filter the thumbnail uses (PageFiles), so
+	// page[0] here is always the thumbnail's file.
+	if pages, err = PageFiles(scanPath); err != nil {
 		result := model.BaseResponseModel{
 			CodeResponse:  400,
 			HeaderMessage: "Error",

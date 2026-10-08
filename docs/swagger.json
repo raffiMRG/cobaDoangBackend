@@ -1102,6 +1102,95 @@
                 }
             }
         },
+        "/id/{id}/thumbnail": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Hitung ulang URL thumbnail dari isi folder di disk (halaman pertama, urutan sama dengan reader) dan simpan kalau berbeda dari yang di DB.\nstatus: ok (sudah benar) | fixed (diperbarui). 409 kalau folder tidak ada di disk (folder_missing) atau tanpa gambar (no_image); DB tidak diubah.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "manga"
+                ],
+                "summary": "Perbaiki thumbnail satu manga",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "new_folders.id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/Model.BaseResponseModel"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "Data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "new": {
+                                                    "type": "string"
+                                                },
+                                                "old": {
+                                                    "type": "string"
+                                                },
+                                                "status": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/Model.BaseResponseModel"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/Model.BaseResponseModel"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "Data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "old": {
+                                                    "type": "string"
+                                                },
+                                                "status": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/import": {
             "post": {
                 "security": [
