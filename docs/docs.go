@@ -743,7 +743,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Mengembalikan task_id; pantau progres lewat GET /folders/progress/{taskID}.",
+                "description": "Folder yang sedang antri/diproses (oleh siapa pun) dilewati dan dikembalikan di ` + "`" + `skipped` + "`" + `.\nStatus per folder dipantau lewat SSE global GET /folders/events.",
                 "consumes": [
                     "application/json"
                 ],
@@ -753,7 +753,7 @@ const docTemplate = `{
                 "tags": [
                     "folders"
                 ],
-                "summary": "Pindahkan folder staging ke DST_DIR (async)",
+                "summary": "Antrikan folder staging untuk dipindah ke DST_DIR",
                 "parameters": [
                     {
                         "description": "ID folders yang dipindah",
@@ -779,8 +779,55 @@ const docTemplate = `{
                                         "Data": {
                                             "type": "object",
                                             "properties": {
-                                                "task_id": {
-                                                    "type": "string"
+                                                "claimed": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "integer"
+                                                    }
+                                                },
+                                                "skipped": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/definitions/FolderRepositorys.SkippedFolder"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/Model.BaseResponseModel"
+                        }
+                    },
+                    "409": {
+                        "description": "Semua id sudah diproses/tidak ditemukan",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/Model.BaseResponseModel"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "Data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "claimed": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "integer"
+                                                    }
+                                                },
+                                                "skipped": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/definitions/FolderRepositorys.SkippedFolder"
+                                                    }
                                                 }
                                             }
                                         }
@@ -808,7 +855,7 @@ const docTemplate = `{
                 "tags": [
                     "folders"
                 ],
-                "summary": "Hapus folder staging (async)",
+                "summary": "Antrikan folder staging untuk dihapus",
                 "parameters": [
                     {
                         "description": "ID folders yang dihapus",
@@ -834,8 +881,17 @@ const docTemplate = `{
                                         "Data": {
                                             "type": "object",
                                             "properties": {
-                                                "task_id": {
-                                                    "type": "string"
+                                                "claimed": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "integer"
+                                                    }
+                                                },
+                                                "skipped": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/definitions/FolderRepositorys.SkippedFolder"
+                                                    }
                                                 }
                                             }
                                         }
@@ -849,43 +905,60 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/Model.BaseResponseModel"
                         }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/Model.BaseResponseModel"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "Data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "claimed": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "integer"
+                                                    }
+                                                },
+                                                "skipped": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/definitions/FolderRepositorys.SkippedFolder"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
                     }
                 }
             }
         },
-        "/folders/progress/{taskID}": {
+        "/folders/events": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Server-Sent Events: ` + "`" + `progress` + "`" + ` (persen, float), lalu ` + "`" + `done` + "`" + `.",
+                "description": "` + "`" + `snapshot` + "`" + ` {items:[{id,name,op,status,percent}]} dikirim pertama di setiap koneksi.\n` + "`" + `item` + "`" + ` {id,name,op,status: queued|processing|moved|deleted|failed, error?}.\n` + "`" + `progress` + "`" + ` {id,percent}. ` + "`" + `changed` + "`" + ` {} = list berubah (mis. setelah /update), ambil ulang.\nKomentar ` + "`" + `: ping` + "`" + ` tiap 20 detik menjaga koneksi tetap hidup.",
                 "produces": [
                     "text/event-stream"
                 ],
                 "tags": [
                     "folders"
                 ],
-                "summary": "Progres move/delete (SSE)",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "task_id dari POST /folders atau /folders/delete",
-                        "name": "taskID",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
+                "summary": "Stream status folder (SSE global)",
                 "responses": {
                     "200": {
                         "description": "event stream",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "404": {
-                        "description": "Task not found",
                         "schema": {
                             "type": "string"
                         }
@@ -1883,6 +1956,17 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "folder_thumbnail": {
+                    "type": "string"
+                }
+            }
+        },
+        "FolderRepositorys.SkippedFolder": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "reason": {
                     "type": "string"
                 }
             }

@@ -27,6 +27,7 @@ import (
 	"web_backend/Middleware"
 	conn "web_backend/Model/Connection"
 	"web_backend/Repository/AuthRepositorys"
+	"web_backend/Repository/FolderRepositorys"
 	_ "web_backend/docs"
 )
 
@@ -127,6 +128,9 @@ func main() {
 		log.Fatal("JWT_SECRET environment variable is required")
 	}
 
+	// Single worker draining the global move/delete queue behind /status.
+	FolderRepositorys.StartFolderWorker()
+
 	r := gin.Default()
 
 	// Default is 32MiB — a manga chapter's worth of page images in one
@@ -173,7 +177,7 @@ func main() {
 
 		// protected.POST("/folders", folderController.MoveRow)
 		protected.POST("/folders", folderController.MoveRowAndTrack)
-		protected.GET("/folders/progress/:taskID", folderController.FolderProgress)
+		protected.GET("/folders/events", folderController.FolderEvents)
 		protected.POST("/folders/delete", folderController.DeleteRowsAndTrack)
 
 		protected.GET("/newFolders", folderController.DisplayDataNewfolder)

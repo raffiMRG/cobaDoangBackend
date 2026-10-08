@@ -19,19 +19,8 @@ import (
 	connection "web_backend/Model/Connection"
 	"web_backend/Repository/UploadRepositorys"
 
-	"sync"
-
 	"gorm.io/gorm"
 )
-
-// ProgressChannels maps a move taskID to a chan float64 that receives a new
-// percentage the instant a file finishes copying — push-based rather than
-// polled, so progress shows up in real time regardless of how fast the copy
-// is. Only one reader is expected per taskID (a single SSE connection); if
-// multiple listeners ever connect to the same taskID concurrently, updates
-// would be split between them rather than broadcast, since this is a
-// personal single-user app and that scenario isn't expected in practice.
-var ProgressChannels sync.Map
 
 func SearchFolders(keyword string, page int) ([]dto.NewFolderQuery, int64, error) {
 	var foldersQuery []dto.NewFolderQuery
@@ -210,7 +199,9 @@ func GetAllData(table string, page, limit int) model.BaseResponseModel {
 	db.Table(table).Count(&total)
 
 	// Ambil data dengan limit & offset
-	query := fmt.Sprintf("SELECT * FROM %s LIMIT ? OFFSET ?", table)
+	// ORDER BY id: stable paging, so when items leave page 1 the next ones
+	// from page 2 are the ones that slide up (see /status realtime refill).
+	query := fmt.Sprintf("SELECT * FROM %s ORDER BY id ASC LIMIT ? OFFSET ?", table)
 	tempResult := db.Raw(query, limit, offset).Scan(&ListData)
 
 	if tempResult.Error != nil {
@@ -732,144 +723,6 @@ func MoveRows(ids []int, sourceTable, targetTable string) model.BaseResponseMode
 		}
 		return successResult
 	}
-}
-
-// DeleteRowsWithProgress permanently removes selected rows from
-// sourceTable ("folders") and their matching directory in SRC_DIR.
-// Mirrors MoveRowsWithProgress's task/SSE plumbing (same
-// ProgressChannels map, same taskID contract) so the frontend can reuse
-// the exact same polling code — but skips the copy-to-DST_DIR/insert
-// half entirely, since there's no destination row for a deleted folder.
-//
-// Unlike move, progress here is reported per FOLDER completed, not per
-// file: os.RemoveAll doesn't offer a per-file callback the way copyPaste
-// does, and deleting is fast enough (no disk-to-disk copy) that
-// per-folder granularity is enough for a progress bar to look live.
-func DeleteRowsWithProgress(taskID string, ids []int, sourceTable string) {
-	srcPath := os.Getenv("SRC_DIR")
-	db := connection.DB
-	total := len(ids)
-
-	progressChan := make(chan float64, total+1)
-	ProgressChannels.Store(taskID, progressChan)
-	defer close(progressChan)
-
-	if total == 0 {
-		progressChan <- 100.0
-		return
-	}
-
-	done := 0
-	_ = db.Transaction(func(tx *gorm.DB) error {
-		for _, id := range ids {
-			if id < 0 {
-				continue
-			}
-
-			strId := strconv.Itoa(id)
-			row, err := GetRowFromId(sourceTable, strId)
-			if err != nil || row == nil {
-				// Row sudah tidak ada (mis. sudah di-delete/move di request
-				// lain) — lewati, bukan fatal, sama seperti perilaku
-				// MoveRowsWithProgress untuk kasus ini.
-				done++
-				progressChan <- (float64(done) / float64(total)) * 100
-				continue
-			}
-
-			source := srcPath + "/" + row.Name + "/"
-
-			// os.RemoveAll tidak error kalau path sudah tidak ada — folder
-			// yang sudah kehapus manual di luar aplikasi tetap boleh
-			// lanjut hapus row DB-nya, bukan nge-block seluruh batch.
-			_ = os.RemoveAll(source)
-			_ = tx.Table(sourceTable).Where("id = ?", row.ID).Delete(nil).Error
-
-			done++
-			progressChan <- (float64(done) / float64(total)) * 100
-		}
-		return nil
-	})
-}
-
-func MoveRowsWithProgress(taskID string, ids []int, sourceTable, targetTable string) {
-	var srcPath = os.Getenv("SRC_DIR")
-	var destPath = os.Getenv("DST_DIR")
-
-	db := connection.DB
-	total := len(ids)
-
-	// Hitung total file di semua folder yang dipilih lebih dulu, supaya
-	// progress bisa dilaporkan per-file, bukan cuma per-folder. Tanpa ini
-	// progress diam di 0% sepanjang waktu penyalinan satu folder (bisa berisi
-	// puluhan halaman manga) lalu lompat langsung ke persentase berikutnya
-	// begitu folder itu selesai total.
-	totalFiles := 0
-	for _, id := range ids {
-		if id < 0 {
-			continue
-		}
-		row, err := GetRowFromId(sourceTable, strconv.Itoa(id))
-		if err != nil || row == nil {
-			continue
-		}
-		source := srcPath + "/" + row.Name + "/"
-		if files, err := ScanFiles(source); err == nil {
-			totalFiles += len(files)
-		}
-	}
-
-	// Buffered sebesar totalFiles+1 supaya penyalinan file TIDAK PERNAH
-	// menunggu SSE handler membaca — kalau browser belum sempat connect
-	// (atau tidak connect sama sekali), update tetap antre di channel dan
-	// langsung "mengejar" begitu listener terhubung, bukan hilang/nge-block.
-	progressChan := make(chan float64, totalFiles+1)
-	ProgressChannels.Store(taskID, progressChan)
-	defer close(progressChan)
-
-	if total == 0 || totalFiles == 0 {
-		progressChan <- 100.0
-		return
-	}
-
-	filesCopied := 0
-	onFileDone := func() {
-		filesCopied++
-		progressChan <- (float64(filesCopied) / float64(totalFiles)) * 100
-	}
-
-	_ = db.Transaction(func(tx *gorm.DB) error {
-		for _, id := range ids {
-			// ===== PROSES PINDAH SAMA SEPERTI MoveRows =====
-			if id < 0 {
-				continue
-			}
-
-			strId := strconv.Itoa(id)
-			row, err := GetRowFromId(sourceTable, strId)
-			if err != nil || row == nil {
-				continue
-			}
-
-			newRow := NewFolder.NewFolder{
-				Name:        row.Name,
-				Thumbnail:   strings.Replace(row.Thumbnail, "/sementara/", "/new/", 1),
-				IsCompleted: false,
-			}
-
-			source := srcPath + "/" + newRow.Name + "/"
-			destination := destPath + "/" + newRow.Name + "/"
-
-			_ = copyPaste(source, destination, onFileDone)
-			_ = tx.Table(targetTable).Create(&newRow).Error
-			_ = os.RemoveAll(source)
-			_ = tx.Table(sourceTable).Where("id = ?", row.ID).Delete(nil).Error
-		}
-
-		// Pastikan selesai 100%
-		progressChan <- 100.0
-		return nil
-	})
 }
 
 func FilteredData(table, table2 string) model.BaseResponseModel {

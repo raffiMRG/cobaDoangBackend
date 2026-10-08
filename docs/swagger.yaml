@@ -24,6 +24,13 @@ definitions:
       folder_thumbnail:
         type: string
     type: object
+  FolderRepositorys.SkippedFolder:
+    properties:
+      id:
+        type: integer
+      reason:
+        type: string
+    type: object
   MessageStatus.Message:
     properties:
       error:
@@ -767,7 +774,9 @@ paths:
     post:
       consumes:
       - application/json
-      description: Mengembalikan task_id; pantau progres lewat GET /folders/progress/{taskID}.
+      description: |-
+        Folder yang sedang antri/diproses (oleh siapa pun) dilewati dan dikembalikan di `skipped`.
+        Status per folder dipantau lewat SSE global GET /folders/events.
       parameters:
       - description: ID folders yang dipindah
         in: body
@@ -786,13 +795,41 @@ paths:
             - properties:
                 Data:
                   properties:
-                    task_id:
-                      type: string
+                    claimed:
+                      items:
+                        type: integer
+                      type: array
+                    skipped:
+                      items:
+                        $ref: '#/definitions/FolderRepositorys.SkippedFolder'
+                      type: array
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/Model.BaseResponseModel'
+        "409":
+          description: Semua id sudah diproses/tidak ditemukan
+          schema:
+            allOf:
+            - $ref: '#/definitions/Model.BaseResponseModel'
+            - properties:
+                Data:
+                  properties:
+                    claimed:
+                      items:
+                        type: integer
+                      type: array
+                    skipped:
+                      items:
+                        $ref: '#/definitions/FolderRepositorys.SkippedFolder'
+                      type: array
                   type: object
               type: object
       security:
       - BearerAuth: []
-      summary: Pindahkan folder staging ke DST_DIR (async)
+      summary: Antrikan folder staging untuk dipindah ke DST_DIR
       tags:
       - folders
   /folders/delete:
@@ -817,28 +854,50 @@ paths:
             - properties:
                 Data:
                   properties:
-                    task_id:
-                      type: string
+                    claimed:
+                      items:
+                        type: integer
+                      type: array
+                    skipped:
+                      items:
+                        $ref: '#/definitions/FolderRepositorys.SkippedFolder'
+                      type: array
                   type: object
               type: object
         "400":
           description: Bad Request
           schema:
             $ref: '#/definitions/Model.BaseResponseModel'
+        "409":
+          description: Conflict
+          schema:
+            allOf:
+            - $ref: '#/definitions/Model.BaseResponseModel'
+            - properties:
+                Data:
+                  properties:
+                    claimed:
+                      items:
+                        type: integer
+                      type: array
+                    skipped:
+                      items:
+                        $ref: '#/definitions/FolderRepositorys.SkippedFolder'
+                      type: array
+                  type: object
+              type: object
       security:
       - BearerAuth: []
-      summary: Hapus folder staging (async)
+      summary: Antrikan folder staging untuk dihapus
       tags:
       - folders
-  /folders/progress/{taskID}:
+  /folders/events:
     get:
-      description: 'Server-Sent Events: `progress` (persen, float), lalu `done`.'
-      parameters:
-      - description: task_id dari POST /folders atau /folders/delete
-        in: path
-        name: taskID
-        required: true
-        type: string
+      description: |-
+        `snapshot` {items:[{id,name,op,status,percent}]} dikirim pertama di setiap koneksi.
+        `item` {id,name,op,status: queued|processing|moved|deleted|failed, error?}.
+        `progress` {id,percent}. `changed` {} = list berubah (mis. setelah /update), ambil ulang.
+        Komentar `: ping` tiap 20 detik menjaga koneksi tetap hidup.
       produces:
       - text/event-stream
       responses:
@@ -846,13 +905,9 @@ paths:
           description: event stream
           schema:
             type: string
-        "404":
-          description: Task not found
-          schema:
-            type: string
       security:
       - BearerAuth: []
-      summary: Progres move/delete (SSE)
+      summary: Stream status folder (SSE global)
       tags:
       - folders
   /id/{id}:

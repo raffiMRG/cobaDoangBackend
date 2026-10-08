@@ -1,6 +1,7 @@
 package FolderControllers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -12,7 +13,6 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 
 	dto "web_backend/DTO"
 	model "web_backend/Model"
@@ -213,6 +213,10 @@ func UpdateAndInsert(c *gin.Context) {
 		}
 	}
 
+	// Let every open /status tab re-fetch its page (new rows inserted or
+	// orphan rows removed above). Cheap even when nothing changed.
+	FolderRepositorys.PublishFoldersChanged()
+
 	c.JSON(http.StatusOK, gin.H{
 		"messages": messages,
 	})
@@ -363,154 +367,132 @@ func MoveRow(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// @Summary Pindahkan folder staging ke DST_DIR (async)
-// @Description Mengembalikan task_id; pantau progres lewat GET /folders/progress/{taskID}.
+// @Summary Antrikan folder staging untuk dipindah ke DST_DIR
+// @Description Folder yang sedang antri/diproses (oleh siapa pun) dilewati dan dikembalikan di `skipped`.
+// @Description Status per folder dipantau lewat SSE global GET /folders/events.
 // @Tags folders
 // @Accept json
 // @Produce json
 // @Param body body dto.InputDataReq true "ID folders yang dipindah"
-// @Success 200 {object} model.BaseResponseModel{Data=object{task_id=string}}
+// @Success 200 {object} model.BaseResponseModel{Data=object{claimed=[]int,skipped=[]FolderRepositorys.SkippedFolder}}
+// @Failure 400 {object} model.BaseResponseModel
+// @Failure 409 {object} model.BaseResponseModel{Data=object{claimed=[]int,skipped=[]FolderRepositorys.SkippedFolder}} "Semua id sudah diproses/tidak ditemukan"
 // @Security BearerAuth
 // @Router /folders [post]
 func MoveRowAndTrack(c *gin.Context) {
-	var request dto.InputDataReq
-	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(http.StatusBadRequest, model.BaseResponseModel{
-			CodeResponse:  400,
-			HeaderMessage: "Bad Request",
-			Message:       err.Error(),
-			Data:          nil,
-		})
-		return
-	}
-
-	// buat ID unik untuk tracking progress
-	taskID := uuid.New().String()
-
-	// Jalankan proses pemindahan di background
-	go FolderRepositorys.MoveRowsWithProgress(taskID, request.IDS, "folders", "new_folders")
-
-	// kirim response taskID ke frontend
-	c.JSON(http.StatusOK, model.BaseResponseModel{
-		CodeResponse:  200,
-		HeaderMessage: "Accepted",
-		Message:       "Proses pemindahan dimulai",
-		Data: map[string]string{
-			"task_id": taskID,
-		},
-	})
+	enqueueFolders(c, "move")
 }
 
-// DeleteRowsAndTrack starts an async, progress-tracked bulk delete of
-// selected "folders" rows (and their SRC_DIR directory) — the /status
-// page's Delete counterpart to MoveRowAndTrack's Move. Reuses the same
-// GET /folders/progress/:taskID SSE endpoint; the frontend can point the
-// existing listenProgress() JS at this taskID without changes.
-// @Summary Hapus folder staging (async)
+// DeleteRowsAndTrack queues selected "folders" rows (and their SRC_DIR
+// directory) for deletion — the delete counterpart to MoveRowAndTrack,
+// sharing the same claim, queue and SSE stream.
+// @Summary Antrikan folder staging untuk dihapus
 // @Tags folders
 // @Accept json
 // @Produce json
 // @Param body body dto.InputDataReq true "ID folders yang dihapus"
-// @Success 200 {object} model.BaseResponseModel{Data=object{task_id=string}}
+// @Success 200 {object} model.BaseResponseModel{Data=object{claimed=[]int,skipped=[]FolderRepositorys.SkippedFolder}}
 // @Failure 400 {object} model.BaseResponseModel
+// @Failure 409 {object} model.BaseResponseModel{Data=object{claimed=[]int,skipped=[]FolderRepositorys.SkippedFolder}}
 // @Security BearerAuth
 // @Router /folders/delete [post]
 func DeleteRowsAndTrack(c *gin.Context) {
-	var request dto.InputDataReq
-	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(http.StatusBadRequest, model.BaseResponseModel{
-			CodeResponse:  400,
-			HeaderMessage: "Bad Request",
-			Message:       err.Error(),
-			Data:          nil,
-		})
-		return
-	}
-
-	if len(request.IDS) == 0 {
-		c.JSON(http.StatusBadRequest, model.BaseResponseModel{
-			CodeResponse:  400,
-			HeaderMessage: "Bad Request",
-			Message:       "no ids provided",
-			Data:          nil,
-		})
-		return
-	}
-
-	taskID := uuid.New().String()
-
-	go FolderRepositorys.DeleteRowsWithProgress(taskID, request.IDS, "folders")
-
-	c.JSON(http.StatusOK, model.BaseResponseModel{
-		CodeResponse:  200,
-		HeaderMessage: "Accepted",
-		Message:       "Proses penghapusan dimulai",
-		Data: map[string]string{
-			"task_id": taskID,
-		},
-	})
+	enqueueFolders(c, "delete")
 }
 
-// @Summary Progres move/delete (SSE)
-// @Description Server-Sent Events: `progress` (persen, float), lalu `done`.
+func enqueueFolders(c *gin.Context, op string) {
+	var request dto.InputDataReq
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, model.BaseResponseModel{CodeResponse: 400, HeaderMessage: "Bad Request", Message: err.Error(), Data: nil})
+		return
+	}
+	if len(request.IDS) == 0 {
+		c.JSON(http.StatusBadRequest, model.BaseResponseModel{CodeResponse: 400, HeaderMessage: "Bad Request", Message: "no ids provided", Data: nil})
+		return
+	}
+
+	claimed, skipped, err := FolderRepositorys.EnqueueFolders(request.IDS, op)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.BaseResponseModel{CodeResponse: 500, HeaderMessage: "Error", Message: err.Error(), Data: nil})
+		return
+	}
+
+	data := gin.H{"claimed": claimed, "skipped": skipped}
+	if len(claimed) == 0 {
+		c.JSON(http.StatusConflict, model.BaseResponseModel{CodeResponse: 409, HeaderMessage: "Conflict", Message: "tidak ada folder yang bisa diproses", Data: data})
+		return
+	}
+	c.JSON(http.StatusOK, model.BaseResponseModel{CodeResponse: 200, HeaderMessage: "Accepted", Message: fmt.Sprintf("%d folder masuk antrian", len(claimed)), Data: data})
+}
+
+// FolderEvents is the global SSE stream behind /status: every connection
+// first gets a `snapshot` of all queued/processing folders, then live
+// `item` / `progress` / `changed` events. A reconnect (EventSource retries
+// on its own) just gets a fresh snapshot, so there is nothing to resume.
+// @Summary Stream status folder (SSE global)
+// @Description `snapshot` {items:[{id,name,op,status,percent}]} dikirim pertama di setiap koneksi.
+// @Description `item` {id,name,op,status: queued|processing|moved|deleted|failed, error?}.
+// @Description `progress` {id,percent}. `changed` {} = list berubah (mis. setelah /update), ambil ulang.
+// @Description Komentar `: ping` tiap 20 detik menjaga koneksi tetap hidup.
 // @Tags folders
 // @Produce text/event-stream
-// @Param taskID path string true "task_id dari POST /folders atau /folders/delete"
 // @Success 200 {string} string "event stream"
-// @Failure 404 {string} string "Task not found"
 // @Security BearerAuth
-// @Router /folders/progress/{taskID} [get]
-func FolderProgress(c *gin.Context) {
-	taskID := c.Param("taskID")
-
-	// === 1️⃣ Set header SSE lengkap ===
+// @Router /folders/events [get]
+func FolderEvents(c *gin.Context) {
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
 	c.Writer.Header().Set("Cache-Control", "no-cache")
 	c.Writer.Header().Set("Connection", "keep-alive")
-	c.Writer.Header().Set("Transfer-Encoding", "chunked")
-	c.Writer.Header().Set("Access-Control-Allow-Origin", "*") // penting kalau beda domain/port
+	c.Writer.Header().Set("X-Accel-Buffering", "no")
 
-	// === 2️⃣ Pastikan flusher tersedia ===
 	flusher, ok := c.Writer.(http.Flusher)
 	if !ok {
 		http.Error(c.Writer, "Streaming unsupported", http.StatusInternalServerError)
 		return
 	}
 
-	// === 3️⃣ Ambil channel progress untuk taskID ini ===
-	// MoveRowsWithProgress mendaftarkan channel-nya di goroutine terpisah,
-	// jadi ada kemungkinan kecil browser connect sebelum itu sempat jalan —
-	// retry singkat (maks ~500ms) alih-alih langsung 404.
-	var progressChan chan float64
-	found := false
-	for i := 0; i < 50; i++ {
-		if val, ok := FolderRepositorys.ProgressChannels.Load(taskID); ok {
-			progressChan = val.(chan float64)
-			found = true
-			break
+	snapshot, events := FolderRepositorys.SubscribeFolderEvents()
+	defer FolderRepositorys.UnsubscribeFolderEvents(events)
+
+	send := func(event string, data any) error {
+		payload, err := json.Marshal(data)
+		if err != nil {
+			return err
 		}
-		time.Sleep(10 * time.Millisecond)
+		if _, err := fmt.Fprintf(c.Writer, "event: %s\ndata: %s\n\n", event, payload); err != nil {
+			return err
+		}
+		flusher.Flush()
+		return nil
 	}
-	if !found {
-		http.Error(c.Writer, "Task not found", http.StatusNotFound)
+
+	fmt.Fprint(c.Writer, "retry: 3000\n\n")
+	if send("snapshot", gin.H{"items": snapshot}) != nil {
 		return
 	}
 
-	// === 4️⃣ Kirim setiap update PERSIS saat diterima — push, bukan polling,
-	// jadi progress muncul real-time apapun kecepatan penyalinannya ===
-	for progress := range progressChan {
-		fmt.Fprintf(c.Writer, "event: progress\ndata: %.2f\n\n", progress)
-		flusher.Flush()
+	// Cloudflare Tunnel drops HTTP connections idle for ~100s.
+	ping := time.NewTicker(20 * time.Second)
+	defer ping.Stop()
+
+	for {
+		select {
+		case <-c.Request.Context().Done():
+			return
+		case <-ping.C:
+			if _, err := fmt.Fprint(c.Writer, ": ping\n\n"); err != nil {
+				return
+			}
+			flusher.Flush()
+		case evt, ok := <-events:
+			if !ok {
+				return // fell behind and was dropped; the browser reconnects and resyncs
+			}
+			if send(evt.Event, evt.Data) != nil {
+				return
+			}
+		}
 	}
-
-	// Channel ditutup oleh MoveRowsWithProgress setelah selesai
-	FolderRepositorys.ProgressChannels.Delete(taskID)
-	fmt.Fprintf(c.Writer, "event: done\ndata: Completed\n\n")
-	flusher.Flush()
-
-	// === 5️⃣ Pastikan koneksi ditutup dengan rapi ===
-	c.Writer.Write([]byte("event: close\ndata: Connection closed\n\n"))
-	flusher.Flush()
 }
 
 // @Summary Folder staging yang belum selesai
